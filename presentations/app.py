@@ -6,12 +6,25 @@ app = FastAPI(title = "Service for PE in MISIS")
 
 registration_service = UserService()
 
+
+@app.get("/menu")
+def start():
+    return ("hello, that's menu")
 @app.post("/login")
-def reg() -> str:
+def auth() -> str:
     if ...:
-        return ("Registration was succesful")
+        return ("Authorisation was successful")
     else: 
-        return ("Registration failed")
+        return ("Authorisation failed")
+    
+@app.post("/signin")
+def register(email:str, password: str, name: str) -> str:
+    print(await registration_service.get_user(email, password=password))
+    if registration_service.get_user(email, password=password) == None:
+        registration_service.put_user(email = email, password = password, name = name)
+        return ("Registration was succussful")
+    else:
+        return ("Registration failed, user with this email is already registered")
 @app.get("/table")
 def get_table():
     print("table")
