@@ -1,10 +1,11 @@
 from persistent.db.Users import User
-from infrastructure.sql.connect import sqlite_connection
+from infrastructure.sql.connect import sqlite_connection, create_all_tables
 from sqlalchemy import insert, select
 
 class UserRepository:
-    def __init__(self):
+    def __init__(self) -> None:
         self._sessionmaker = sqlite_connection()
+        create_all_tables()
         
     async def put_user(self, name:str, email:str, password:str) -> None:
         stmp = insert(User).values({"email":email, "name":name, "password":password})
@@ -18,6 +19,7 @@ class UserRepository:
             
         async with self._sessionmaker as session:
             resp = await session.execute(stmp)
+            
         row = resp.fetchone()
         if row is None:
             return None

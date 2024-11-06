@@ -18,7 +18,7 @@ def auth() -> str:
         return ("Authorisation failed")
     
 @app.post("/signin")
-def register(email:str, password: str, name: str) -> str:
+async def register(email:str, password: str, name: str) -> str:
     print(await registration_service.get_user(email, password=password))
     if registration_service.get_user(email, password=password) == None:
         registration_service.put_user(email = email, password = password, name = name)
