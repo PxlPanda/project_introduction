@@ -19,9 +19,9 @@ def auth() -> str:
     
 @app.post("/signin")
 async def register(email:str, password: str, name: str) -> str:
-    print(await registration_service.get_user(email, password=password))
-    if await registration_service.get_user(email, password=password) == None:
-        await registration_service.put_user(email = email, password = password, name = name)
+    is_in = await registration_service.get_user(email = email, password=password)
+    if is_in == None:
+        task = await registration_service.put_user(email = email, password = password, name = name)
         return ("Registration was succussful")
     else:
         return ("Registration failed, user with this email is already registered")

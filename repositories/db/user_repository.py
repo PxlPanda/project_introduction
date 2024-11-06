@@ -15,7 +15,7 @@ class UserRepository:
             await session.commit()
             
     async def get_user(self, email:str, password:str) -> str|None:
-        stmp = select(User).where(User.password == password, User.email == email).limit(1)
+        stmp = select(User.id).where(User.password == password, User.email == email).limit(1)
             
         async with self._sessionmaker() as session:
             resp = await session.execute(stmp)
@@ -24,4 +24,4 @@ class UserRepository:
         if row is None:
             return None
         else:
-            return row
+            return row[0]
