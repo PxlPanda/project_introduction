@@ -2,8 +2,6 @@ from persistent.db.base import Base, uuid4_as_str
 from sqlalchemy import Column, Text, Table, Integer, MetaData
 
 
-metadata_obj = MetaData
-
 class User(Base):
     __tablename__ = "users"
     
