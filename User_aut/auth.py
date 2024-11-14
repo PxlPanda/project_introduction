@@ -23,3 +23,4 @@ def create_access_token(data: dict) -> str:
     auth_data = get_auth_data()
     encode_jwt = jwt.encode(to_encode, auth_data['secret_key'], algorithm=auth_data['algorithm'])
     return encode_jwt
+#fuck me
