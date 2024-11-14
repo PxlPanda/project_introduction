@@ -25,3 +25,16 @@ class UserRepository:
             return None
         else:
             return row[0]
+        
+    #kak po DRY?
+    async def get_user_by_uuid(self, uuid:str) -> str|None:
+        stmp = select(User.id).where(User.uuid == uuid).limit(1)
+            
+        async with self._sessionmaker() as session:
+            resp = await session.execute(stmp)
+            
+        row = resp.fetchone()
+        if row is None:
+            return None
+        else:
+            return row[0]

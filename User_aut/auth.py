@@ -1,27 +1,47 @@
-from passlib.context import CryptContext# type: ignore
+from fastapi.security import APIKeyHeader
+from jose import jwt#type: ignore
+import os
+from dotenv import load_dotenv # type: ignore
+from fastapi import APIKey, Request, Security
+import jwt
+from repositories.db.user_repository import UserRepository
 
+load_dotenv()
+JWT_SECRET = os.getenv("JWT_SECRET")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+class Token():
+    def __init__(self):
+        ...
+    def give_token(id):
+        token = jwt.encode(payload={"sub": id}, key=JWT_SECRET, algorithm="HS256")
+    async def check_access_token(
+        request: Request,
+        authorization_header: str = Security(APIKeyHeader(name="Authorization", auto_error=False))
+    ) -> str:
+        # Проверяем, что токен передан
+        if authorization_header is None:
+            raise Exception()
 
+        # Проверяем токен на соответствие форме
+        if "Bearer " not in authorization_header:
+            raise Exception()
 
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+        # Убираем лишнее из токена
+        clear_token = authorization_header.replace("Bearer ", "")
 
+        try:
+            # Проверяем валидность токена
+            payload = jwt.decode(jwt=clear_token, key=JWT_SECRET, algorithms=["HS256", "RS256"])
+        except Exception:
+            # В случае невалидности возвращаем ошибку
+            raise Exception()
+        
+        # Идентифицируем пользователя
+        repository = UserRepository()
+        user = await repository.get_user_by_uuid(id = payload["sub"])
+        if not user:
+            raise Exception()
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+        request.state.user = user
 
-from jose import jwt
-from datetime import datetime, timedelta, timezone
-from app.config import get_auth_data
-
-
-def create_access_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(days=30)
-    to_encode.update({"exp": expire})
-    auth_data = get_auth_data()
-    encode_jwt = jwt.encode(to_encode, auth_data['secret_key'], algorithm=auth_data['algorithm'])
-    return encode_jwt
-#fuck me
-#fuck you
+        return authorization_header
