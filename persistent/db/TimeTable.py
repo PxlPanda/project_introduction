@@ -8,4 +8,5 @@ class TTable(Base):
     time = Column(Text, primary_key = True)
     is_free =Column (Integer, default = 1)
     by_whom = Column (Text, default = "")
+
     

@@ -1,6 +1,8 @@
 from persistent.db.Users import User
 from infrastructure.sql.connect import sqlite_connection, create_all_tables
 from sqlalchemy import insert, select
+from User_aut.auth import Token
+from persistent.db.base import uuid4_as_str
 
 class UserRepository:
     def __init__(self) -> None:
@@ -8,7 +10,10 @@ class UserRepository:
         create_all_tables()
         
     async def put_user(self, name:str, email:str, password:str) -> None:
-        stmp = insert(User).values({"email":email, "name":name, "password":password}) 
+        uuid = uuid4_as_str()
+        token = str(Token.give_token(id = uuid))
+        print(token)
+        stmp = insert(User).values({"id":uuid, "email":email, "name":name, "password":password, "token":token}) 
         
         async with self._sessionmaker() as session:
             await session.execute(stmp)

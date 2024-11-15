@@ -2,9 +2,9 @@ from fastapi.security import APIKeyHeader
 from jose import jwt#type: ignore
 import os
 from dotenv import load_dotenv # type: ignore
-from fastapi import APIKey, Request, Security
+from fastapi import Request, Security
 import jwt
-from repositories.db.user_repository import UserRepository
+
 
 load_dotenv()
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -14,6 +14,7 @@ class Token():
         ...
     def give_token(id):
         token = jwt.encode(payload={"sub": id}, key=JWT_SECRET, algorithm="HS256")
+        return token
     async def check_access_token(
         request: Request,
         authorization_header: str = Security(APIKeyHeader(name="Authorization", auto_error=False))
@@ -37,11 +38,4 @@ class Token():
             raise Exception()
         
         # Идентифицируем пользователя
-        repository = UserRepository()
-        user = await repository.get_user_by_uuid(id = payload["sub"])
-        if not user:
-            raise Exception()
-
-        request.state.user = user
-
-        return authorization_header
+        return payload["sub"]

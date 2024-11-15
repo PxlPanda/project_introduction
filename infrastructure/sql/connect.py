@@ -14,6 +14,7 @@
 #     engine  = create_engine(sqliteurl, connect_args = {"check_same_thrade" : False})
     
 #     Base.metadata.create_all(engine)
+
 from persistent.db.base import Base
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
