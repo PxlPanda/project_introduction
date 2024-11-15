@@ -1,0 +1,128 @@
+.login {
+  margin: 0 auto;
+  padding-top: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login__form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 358px;
+  align-items: center;
+  font-family: 'Inter';
+}
+
+@media screen and (max-width: 620px) {
+  .login__form {
+    max-width: 282px;
+  }
+}
+
+.login__title {
+  font-family: 'Inter';
+  font-weight: 900;
+  font-size: 24px;
+  line-height: 29px;
+  color: #fff;
+  margin: 0;
+  padding-bottom: 50px;
+}
+
+.login__input {
+  border: 0;
+  width: 100%;
+  margin-top: 12px;
+  padding: 0;
+  padding-bottom: 10px;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(204, 204, 204, .2);
+  background-color: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 17px;
+  color: #fff;
+}
+
+.login__input:focus {
+  outline: none;
+}
+
+.login__button {
+  max-width: 358px;
+  width: 100%;
+  height: 50px;
+  border: 0;
+  background-color: #fff;
+  border-radius: 2px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity .4s;
+  color: #000;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 22px;
+  text-align: center;
+  margin-top: 186px;
+}
+
+.login__button:hover {
+  opacity: .85;
+}
+
+.login__button_disabled {
+  border: 1px solid #000;
+  color: #000;
+  background-color: #fff;
+  opacity: .3;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media screen and (max-width: 620px) {
+  .login__button {
+    max-width: 282px;
+    height: 46px;
+    font-size: 16px;
+    line-height: 19px;
+  }
+}
+
+.login__error {
+  margin-top: 4px;
+  font-family: 'Inter';
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 15px;
+  color: #fff;
+  max-width: 358px;
+  width: 100%;
+  min-height: 30px;
+}
+
+@media screen and (max-width: 620px) {
+  .login__error {
+    max-width: 230px;
+  }
+}
+
+.login__teacher-login-textformat {
+  font-size: 12px;
+  color: #fff;
+  transition: all 500ms;
+  visibility: hidden;
+  opacity: 0;
+  align-self: flex-start;
+  color: #8a8a8a;
+  padding-top: 5px;
+}
+
+.login__teacher-login-textformat_active {
+  visibility:visible;
+  opacity:1;
+}
