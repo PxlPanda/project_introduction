@@ -2,4 +2,8 @@ from presentations.app import app
 import uvicorn
 
 
-uvicorn.run(app)
+def main():
+    uvicorn.run(app)
+
+if __name__ == "main":
+    main()
