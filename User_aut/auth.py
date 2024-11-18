@@ -2,10 +2,10 @@ from fastapi.security import APIKeyHeader
 from jose import jwt#type: ignore
 import os
 from fastapi import Request, Security
-import jwt
+from jwt import load_dotenv() # type: ignore
 
 
-JWT_SECRET = os.getenv("JWT_SECRET")
+load_dotenv()
 
 class Token():
     def __init__(self):

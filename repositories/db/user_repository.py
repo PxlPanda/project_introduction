@@ -5,6 +5,9 @@ from User_aut.auth import Token
 from persistent.db.base import uuid4_as_str
 import os
 from hashlib import sha256
+from dotenv import load_dotenv#type: ignore
+
+load_dotenv()
 
 class UserRepository:
     def __init__(self) -> None:
@@ -26,8 +29,8 @@ class UserRepository:
     async def get_user(self, email:str, password:str) -> str|None:
         hashed_password = sha256()
         hashed_password.update(password.encode())
-        hashed_password.update(os.getenv("SALT".encode()))
-        stmp = select(User.id).where(User.password == hashed_password, User.email == email).limit(1)
+        hashed_password.update(os.getenv("SALT").encode())
+        stmp = select(User.id).where(User.password == hashed_password.hexdigest(), User.email == email).limit(1)
             
         async with self._sessionmaker() as session:
             resp = await session.execute(stmp)
