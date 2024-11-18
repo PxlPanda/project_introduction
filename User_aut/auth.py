@@ -1,12 +1,10 @@
 from fastapi.security import APIKeyHeader
 from jose import jwt#type: ignore
 import os
-from dotenv import load_dotenv # type: ignore
 from fastapi import Request, Security
 import jwt
 
 
-load_dotenv()
 JWT_SECRET = os.getenv("JWT_SECRET")
 
 class Token():
