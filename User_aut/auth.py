@@ -2,7 +2,7 @@ from fastapi.security import APIKeyHeader
 from jose import jwt#type: ignore
 import os
 from fastapi import Request, Security
-from jwt import load_dotenv() # type: ignore
+from dotenv import load_dotenv # type: ignore
 
 
 load_dotenv()
@@ -11,7 +11,7 @@ class Token():
     def __init__(self):
         ...
     def give_token(id):
-        token = jwt.encode(payload={"sub": id}, key=JWT_SECRET, algorithm="HS256")
+        token = jwt.encode(claims={"sub": id}, key=os.getenv("JWT_SECRET"), algorithm="HS256")
         return token
     async def check_access_token(
         request: Request,
@@ -30,7 +30,7 @@ class Token():
 
         try:
             # Проверяем валидность токена
-            payload = jwt.decode(jwt=clear_token, key=JWT_SECRET, algorithms=["HS256", "RS256"])
+            payload = jwt.decode(jwt=clear_token, key=os.getenv("JWT_SECRET"), algorithms=["HS256", "RS256"])
         except Exception:
             # В случае невалидности возвращаем ошибку
             raise Exception()

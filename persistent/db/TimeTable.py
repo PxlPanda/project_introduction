@@ -6,7 +6,7 @@ class TTable(Base):
     __tablename__ = "ttable"
     
     time = Column(Text, primary_key = True)
-    is_free =Column (Integer, default = 1)
+    is_free =Column (Boolean, default = True)
     by_whom = Column (Text, default = "")
 
     

@@ -14,11 +14,13 @@ table_service = TableService()
 def start():
     return ("hello, that's menu")
 @app.post("/login")
-def auth(email:str, password:str) -> str:
+async def auth(email:str, password:str) -> str:
     if registration_service.get_user(email = email, password = password) != None:
-        return ("Authorisation was successful")
+        #return registration_service.get_user(email = email, password = password)["input"]
+        answer = str(await registration_service.get_user(email = email, password = password))
+        return answer
     else: 
-        return ("Authorisation failed")
+        return "fuck up"
     
 @app.post("/signin")
 async def register(email:str, password: str, name: str) -> str:
@@ -28,18 +30,12 @@ async def register(email:str, password: str, name: str) -> str:
         return ("Registration was succussful")
     else:
         return ("Registration failed, user with this email is already registered")
-@app.get("/get_free_time")
-async def get_free_time(perm: str):
-    return await table_service.get_free_time(perm = perm)
+@app.get("/get_busy_time")
+async def get_busy_time(uuid):
+    return await table_service.get_busy_time(uuid= uuid)
 @app.post("/table/reserve_time")
-async def reserve_time(time, person):
-    # is_reserved = await table_service.get_free_time(perm = perm)
-    # if :
-    #     print("time succesfully reserved")
-    # else:
-    #     print("time already reserved")
-    print(await table_service.get_free_time(time = time, person = person))
-    await table_service.put_time(time = time, person = person)
+async def reserve_time(time, uuid):
+    await table_service.put_time(time = time, uuid = uuid)
     return ("time successfuly reserved!") 
 @app.get("/token_check")
 def check_token(request, authorization_header):

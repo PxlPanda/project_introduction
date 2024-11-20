@@ -1,5 +1,5 @@
 from persistent.db.base import Base, uuid4_as_str
-from sqlalchemy import Column, Text, Table, Integer, MetaData
+from sqlalchemy import Column, Text, Table, Integer, MetaData, Boolean
 
 
 class User(Base):
@@ -10,3 +10,4 @@ class User(Base):
     email = Column(Text, default = "", unique = True)
     password = Column(Text, default = "")
     token = Column(Text, unique= True)
+    is_admin = Column(Boolean, default = "False")
