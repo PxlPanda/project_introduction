@@ -1,24 +1,26 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.contrib.auth import get_user_model
 
-# Получаем модель пользователя, чтобы избежать циклического импорта
-User = get_user_model()
-
-# Валидация для email
+# Валидатор для email, чтобы проверять домен edu.misis.ru
 def validate_edu_misis_email(value):
     if not value.endswith('@edu.misis.ru'):
-        raise ValidationError('Email должен оканчиваться на @edu.misis.ru')
+        raise ValidationError('Email должен быть на домене @edu.misis.ru')
 
-class Leads(models.Model):
-    name = models.CharField(max_length=100, verbose_name="Имя")  # Исправлено max_lenght на max_length
-    email = models.EmailField(unique=True, validators=[validate_edu_misis_email],verbose_name="Email")  # Поле для email с проверкой
-    group = models.CharField(max_length=10,verbose_name="Группа")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name= "Дата создания")
-    
+# Модель преподавателя
+class Teacher(models.Model):
+    full_name = models.CharField(max_length=255)
+    password = models.CharField(max_length=255)
+
     def __str__(self):
-        return self.name
-    
-    class Meta:
-        verbose_name = "Лид"
-        verbose_name_plural = "Лиды"
+        return self.full_name
+
+
+# Модель студента
+class Student(models.Model):
+    full_name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=255)
+    group_name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.full_name

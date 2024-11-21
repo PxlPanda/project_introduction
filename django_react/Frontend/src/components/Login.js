@@ -5,112 +5,178 @@ import FormInput from './FormInput.js';
 import Checkbox from './Checkbox.js';
 
 function Login({ onLogin }) {
+  const {
+    values,
+    handleChange,
+    errors,
+    isInputValid,
+    resetForm,
+    isSubmitButtonActive,
+    getInputNames,
+  } = useFormAndValidation();
 
-const {values, handleChange, errors, isInputValid, resetForm, isSubmitButtonActive, getInputNames} = useFormAndValidation();
+  const [teacherLoginChecked, setTeacherLoginChecked] = useState(false);
+  const [responseMessage, setResponseMessage] = useState(null); // Состояние для сообщения
+  const [isSuccess, setIsSuccess] = useState(false); // Состояние успеха/ошибки
 
-const [teacherLoginChecked, setTeacherLoginChecked] = useState(false);
-const [teacherName, setTeacherName] = useState(false);
-const loginData = {
-  email: null,
-  password: null
-}
-let loginPlaceHolder = teacherName? 'Email' : 'ФИО';
-let loginPattern = teacherName? "[a-zA-Z0-9]+@edu.misis.ru" : "[a-zA-Z ]";
-let loginTitle = teacherName? 'login@edu.misis.ru' : 'Фамилия И.О';
+  const loginData = {
+    email: null,
+    password: null,
+  };
 
-const handleTeacherLogin = () => {
-  setTeacherLoginChecked(!teacherLoginChecked);
-  // some actions here
-  
-};
+  const loginPlaceHolder = teacherLoginChecked ? 'ФИО' : 'Email';
+  const loginPattern = teacherLoginChecked ? '^[А-ЯЁа-яё]+\\s[А-ЯЁа-яё]\\.[А-ЯЁа-яё]\\.$' : '^[a-zA-Z0-9._%+-]+@edu\\.misis\\.ru$'
+
+    ? '^[А-ЯЁа-яё]+\\s[А-ЯЁа-яё]\\.[А-ЯЁа-яё]\\.$'
+    : '^[a-zA-Z0-9._%+-]+@edu\\.misis\\.ru$';
+  const loginTitle = teacherLoginChecked
+    ? 'Формат ФИО: Фамилия И.О.'
+    : 'example@edu.misis.ru';
+
+  const handleTeacherLogin = () => {
+    setTeacherLoginChecked(!teacherLoginChecked);
+    resetForm(); // Очистка формы при смене режима
+  };
 
   const inputElements = [
     {
       id: 1,
-      type: "text",
-      name: "loginEmail",
-      className: "login__input login__input_el_login-Email",
+      type: 'text',
+      name: 'loginInput',
+      className: 'login__input login__input_el_login-input',
       required: true,
-      minLength: "2",
-      maxLength: "40",
+      minLength: '2',
+      maxLength: '40',
       pattern: `${loginPattern}`,
       title: `${loginTitle}`,
-      placeholder: `${loginPlaceHolder}`
+      placeholder: `${loginPlaceHolder}`,
     },
     {
       id: 2,
-      type: "password",
-      name: "loginPassword",
-      className: "login__input login__input_el_login-password",
+      type: 'password',
+      name: 'loginPassword',
+      className: 'login__input login__input_el_login-password',
       required: true,
-      placeholder: "Пароль",
-      minLength: "7"
-    }
-  ]
+      placeholder: 'Пароль',
+      minLength: '7',
+    },
+  ];
 
   const clearInputs = () => {
     resetForm();
-  }
+  };
 
   const nameInputs = getInputNames(inputElements);
 
-  // функция, формирующая данные для последующего обращения с ними на сервер
   function gatherLoginData() {
     for (const key in loginData) {
       nameInputs.forEach((el) => {
         if (el.toLowerCase().includes(key.toString())) {
           loginData[key] = values[el];
         }
-      })
+      });
     }
     return loginData;
   }
 
-  //функция submit формы (обновление пользовательских данных на сервере)
-  function handleSubmit(ev) {
+  async function handleSubmit(ev, isFirstLogin = false) {
     ev.preventDefault();
-    onLogin();
+    const loginDetails = gatherLoginData();
+
+    try {
+      const response = await fetch(
+        isFirstLogin ? '/api/register/teacher/' : '/api/register/student/',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(loginDetails),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setResponseMessage(data.message);
+        setIsSuccess(true); // Успех
+      } else {
+        setResponseMessage(data.message || 'Что-то пошло не так');
+        setIsSuccess(false); // Ошибка
+      }
+    } catch (error) {
+      setResponseMessage('Ошибка соединения с сервером');
+      setIsSuccess(false); // Ошибка
+    }
+
+    // Оставляем пользователя на текущей странице
     clearInputs();
   }
 
-  useEffect(() => {
-    setTeacherName(!teacherName);
-    const loginData = gatherLoginData();
-    for (const key in loginData) {
-      if (loginData[key]) {
-        if (loginData[key].length !== 0) {
-          clearInputs();
-          break;
-        }
-      }  
-    }
-  }, [teacherLoginChecked]);
-
   return (
     <section className="login">
-      <form onSubmit={handleSubmit} name="loginForm" className="login__form" noValidate>
-      <h2 className="login__title">Вход</h2>
-        {
-          inputElements.map((input) => (
-            <FormInput key={input.id}
-              {...input}
-              value={values[input.name] || ""}
-              inputElement={input}
-              isInputValid={isInputValid[input.name]}
-              errorMessageText={errors[input.name]}
-              onChange={handleChange} />
-          ))
-        }
+      <form
+        name="loginForm"
+        className="login__form"
+        noValidate
+        onSubmit={(e) => e.preventDefault()} // Предотвращаем редирект формы
+      >
+        <h2 className="login__title">Вход</h2>
+        {inputElements.map((input) => (
+          <FormInput
+            key={input.id}
+            {...input}
+            value={values[input.name] || ''}
+            inputElement={input}
+            isInputValid={isInputValid[input.name]}
+            errorMessageText={errors[input.name]}
+            onChange={handleChange}
+          />
+        ))}
         <Checkbox
           label="Войти как преподаватель"
           value={teacherLoginChecked}
           onChange={handleTeacherLogin}
         />
-        <span className={`login__teacher-login-textformat ${!teacherName && 'login__teacher-login-textformat_active'}`}>Формат ФИО: Фамилия И.О.</span>
-        <button type="submit" disabled={!isSubmitButtonActive} className={`login__button ${isSubmitButtonActive ? '' : 'login__button_disabled'}`}>Войти</button>
+        <span className="login__format-text">{loginTitle}</span>
+        <div className="login__button-container">
+          <button
+            type="button"
+            onClick={(e) => handleSubmit(e, false)}
+            disabled={!isSubmitButtonActive}
+            className={`login__button ${
+              isSubmitButtonActive ? '' : 'login__button_disabled'
+            }`}
+          >
+            Войти
+          </button>
+          <button
+            type="button"
+            onClick={(e) => handleSubmit(e, true)}
+            disabled={!isSubmitButtonActive}
+            className={`login__button login__button_secondary ${
+              isSubmitButtonActive ? '' : 'login__button_disabled'
+            }`}
+          >
+            Первый вход
+          </button>
+        </div>
       </form>
+
+      {/* Сообщение об успехе или ошибке */}
+      {responseMessage && (
+        <div
+          className={`response-message ${
+            isSuccess ? 'response-message_success' : 'response-message_error'
+          }`}
+        >
+          {responseMessage}
+        </div>
+      )}
     </section>
   );
 }
+
+
 
 export default Login;
