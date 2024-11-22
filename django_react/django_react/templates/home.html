@@ -1,0 +1,28 @@
+<div>
+    <h1>Главная страница</h1>
+    <div>
+        {% for hall in halls %}
+            <div>
+                <h3>{{ hall.name }}</h3>
+                <p>Время: {{ hall.time }}</p>
+                <p>
+                    Заполненность: 
+                    {% if hall.capacity <= 20 %}
+                        <span style="color: green;">
+                            {{ hall.capacity }}/{{ hall.max_capacity }}
+                        </span>
+                    {% elif hall.capacity < hall.max_capacity %}
+                        <span style="color: orange;">
+                            {{ hall.capacity }}/{{ hall.max_capacity }}
+                        </span>
+                    {% else %}
+                        <span style="color: red;">
+                            {{ hall.capacity }}/{{ hall.max_capacity }}
+                        </span>
+                    {% endif %}
+                </p>
+                <button>Записаться</button>
+            </div>
+        {% endfor %}
+    </div>
+</div>

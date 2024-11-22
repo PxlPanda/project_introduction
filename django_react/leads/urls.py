@@ -1,14 +1,26 @@
+# leads/urls.py
+
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
-    path('api/register/teacher/', views.register_teacher),
-    path('api/register/student/', views.register_student),
+    # Получение списков
+    path('students/', views.get_students, name='get_students'),
+    path('teachers/', views.get_teachers, name='get_teachers'),
+    
+    # Создание записей
+    path('create/student/', views.create_student, name='create_student'),
+    path('create/teacher/', views.create_teacher, name='create_teacher'),
+    
+    # Новый эндпоинт для регистрации
+    path('register/student/', views.register_student, name='register_student'),  # Для регистрации студента
+    path('register/teacher/', views.register_teacher, name='register_teacher'),  # Для регистрации преподавателя
+    
+    # Обновление записей
+    path('update/student/<int:student_id>/', views.update_student, name='update_student'),
+    path('update/teacher/<int:teacher_id>/', views.update_teacher, name='update_teacher'),
+    
+    # Удаление записей
+    path('delete/student/<int:student_id>/', views.delete_student, name='delete_student'),
+    path('delete/teacher/<int:teacher_id>/', views.delete_teacher, name='delete_teacher'),
 ]
-
-# Обслуживание статических файлов (включая manifest.json) в режиме разработки
-urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-
-# Если файлы находятся в других местах или вам нужно добавить дополнительные URL для обслуживания фронтенда, можно настроить их здесь

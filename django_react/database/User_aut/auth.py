@@ -1,41 +1,22 @@
-from fastapi.security import APIKeyHeader
-from jose import jwt#type: ignore
+# user_aut/auth.py
+
+from jose import jwt
 import os
-from dotenv import load_dotenv # type: ignore
-from fastapi import Request, Security
-import jwt
 
+JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key")  # Используйте переменные окружения для хранения ключа
 
-load_dotenv()
-JWT_SECRET = os.getenv("JWT_SECRET")
+class Token:
+    @staticmethod
+    def give_token(id: str):
+        # Создание JWT токена
+        return jwt.encode({"sub": id}, JWT_SECRET, algorithm="HS256")
 
-class Token():
-    def __init__(self):
-        ...
-    def give_token(id):
-        token = jwt.encode(payload={"sub": id}, key=JWT_SECRET, algorithm="HS256")
-        return token
-    async def check_access_token(
-        request: Request,
-        authorization_header: str = Security(APIKeyHeader(name="Authorization", auto_error=False))
-    ) -> str:
-        # Проверяем, что токен передан
-        if authorization_header is None:
-            raise Exception()
-
-        # Проверяем токен на соответствие форме
-        if "Bearer " not in authorization_header:
-            raise Exception()
-
-        # Убираем лишнее из токена
-        clear_token = authorization_header.replace("Bearer ", "")
-
+    @staticmethod
+    def check_access_token(token: str) -> str:
         try:
-            # Проверяем валидность токена
-            payload = jwt.decode(jwt=clear_token, key=JWT_SECRET, algorithms=["HS256", "RS256"])
-        except Exception:
-            # В случае невалидности возвращаем ошибку
-            raise Exception()
-        
-        # Идентифицируем пользователя
-        return payload["sub"]
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            return payload["sub"]  # Возвращаем ID пользователя из токена
+        except jwt.ExpiredSignatureError:
+            raise Exception("Token expired")
+        except jwt.JWTError:
+            raise Exception("Invalid token")

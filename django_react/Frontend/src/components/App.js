@@ -1,25 +1,23 @@
 import React, { useState } from 'react';
-import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 import Main from './Main.js';
 import Login from './Login.js';
 import Register from './Register.js';
-import ProtectedRouteElement from './ProtectedRoute';
+import ProtectedRouteElement from './ProtectedRoute.js';  // Убедитесь, что путь корректен
 
 function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const navigate = useNavigate();
-
-  function handleLogin() {
-    setLoggedIn(true);
-    navigate('/', { replace: true }); // Перенаправляем на главную страницу
-  }
+  // Переменная для контроля пропуска входа
+  const skipLogin = true;  // Если true — пропускает вход и идет на главную страницу
+  const [loggedIn, setLoggedIn] = useState(skipLogin);  // Устанавливаем состояние авторизации
 
   return (
     <Routes>
-      <Route path="*" element={loggedIn ? <Navigate to="/" replace /> : <Navigate to="/signin" replace />} />
-      <Route path="/" element={<ProtectedRouteElement element={Main} loggedIn={loggedIn} />} />
-      <Route path="/signin" element={<Login onLogin={handleLogin} />} />
+      {/* Если skipLogin true, пропускаем авторизацию и показываем Main */}
+      <Route path="/" element={skipLogin ? <Main /> : <ProtectedRouteElement element={Main} loggedIn={loggedIn} />} />
+      <Route path="/signin" element={<Login onLogin={() => setLoggedIn(true)} />} />
       <Route path="/register" element={<Register />} />
+      {/* Редирект на вход, если не авторизован */}
+      <Route path="*" element={<Navigate to={loggedIn ? '/' : '/signin'} replace />} />
     </Routes>
   );
 }
