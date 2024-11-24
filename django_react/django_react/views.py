@@ -5,17 +5,31 @@ from django.contrib.auth import authenticate, login
 from leads.models import Teacher, Student
 from leads.serializers import TeacherSerializer, StudentSerializer
 from django.contrib.auth.decorators import login_required
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 import os
 from django.conf import settings
+from rest_framework import status
+import logging
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
+
+logger = logging.getLogger(__name__)
 
 from django.shortcuts import render
 
 def index(request):
-    """
-    Главная страница.
-    """
-    return render(request, 'index.html')  # Убедитесь, что у вас есть файл index.html
+    try:
+        with open(os.path.join(settings.REACT_APP_DIR, 'build', 'index.html')) as f:
+            return HttpResponse(f.read())
+    except FileNotFoundError:
+        return HttpResponse(
+            """
+            This URL is only used when you have built the production
+            version of the app. Visit http://localhost:3000/ instead, or
+            run `npm run build` to test the production version.
+            """,
+            status=501,
+        )
 
 # Регистрация преподавателя
 @api_view(['POST'])
@@ -26,8 +40,9 @@ def register_teacher(request):
     serializer = TeacherSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response({'message': 'Преподаватель успешно зарегистрирован'}, status=201)
-    return Response(serializer.errors, status=400)
+        return Response({'message': 'Преподаватель успешно зарегистрирован'}, status=status.HTTP_201_CREATED)
+    logger.error(f"Ошибка регистрации преподавателя: {serializer.errors}")
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Регистрация студента
 @api_view(['POST'])
@@ -38,31 +53,60 @@ def register_student(request):
     serializer = StudentSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response({'message': 'Студент успешно зарегистрирован'}, status=201)
-    return Response(serializer.errors, status=400)
+        return Response({'message': 'Студент успешно зарегистрирован'}, status=status.HTTP_201_CREATED)
+    logger.error(f"Ошибка регистрации студента: {serializer.errors}")
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Авторизация пользователя
 @api_view(['POST'])
 def login_user(request):
     """
-    Авторизация пользователя через API.
+    Авторизация пользователя (преподавателя или студента).
     """
-    email = request.data.get('email')
-    password = request.data.get('password')
     try:
-        teacher = Teacher.objects.get(email=email)
-        user = authenticate(request, username=teacher.email, password=password)
-    except Teacher.DoesNotExist:
-        try:
-            student = Student.objects.get(email=email)
-            user = authenticate(request, username=student.email, password=password)
-        except Student.DoesNotExist:
-            return Response({'message': 'Пользователь не найден'}, status=404)
+        user_type = request.data.get('user_type')
+        password = request.data.get('password')
 
-    if user:
-        login(request, user)  # Создание сессии
-        return Response({'message': 'Вход выполнен успешно'}, status=200)
-    return Response({'message': 'Неверный пароль'}, status=401)
+        if user_type == 'teacher':
+            full_name = request.data.get('full_name')
+            if not full_name:
+                return Response({'error': 'ФИО обязательно'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                teacher = Teacher.objects.get(full_name=full_name)
+                if teacher.check_password(password):
+                    return Response({
+                        'message': 'Успешный вход',
+                        'user_type': 'teacher',
+                        'full_name': teacher.full_name
+                    }, status=status.HTTP_200_OK)
+            except Teacher.DoesNotExist:
+                logger.warning(f"Попытка входа с несуществующим ФИО преподавателя: {full_name}")
+                return Response({'error': 'Неверные учетные данные'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        elif user_type == 'student':
+            email = request.data.get('email')
+            if not email:
+                return Response({'error': 'Email обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                student = Student.objects.get(email=email)
+                if student.check_password(password):
+                    return Response({
+                        'message': 'Успешный вход',
+                        'user_type': 'student',
+                        'email': student.email,
+                        'full_name': student.full_name
+                    }, status=status.HTTP_200_OK)
+            except Student.DoesNotExist:
+                logger.warning(f"Попытка входа с несуществующим email студента: {email}")
+                return Response({'error': 'Неверные учетные данные'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        return Response({'error': 'Неверный пароль'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    except Exception as e:
+        logger.error(f"Ошибка при входе: {str(e)}")
+        return Response({'error': 'Ошибка сервера'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Страница входа
 def signin(request):
@@ -128,4 +172,16 @@ def get_halls(request):
     """
     Получение информации о залах для записи на занятия.
     """
-    return Response({'halls': HALLS}, status=200)
+    return Response({'halls': HALLS}, status=status.HTTP_200_OK)
+
+# Serve manifest.json file
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def serve_manifest(request):
+    manifest_path = os.path.join(settings.REACT_APP_DIR, 'public', 'manifest.json')
+    if os.path.exists(manifest_path):
+        with open(manifest_path, 'r') as f:
+            import json
+            manifest_data = json.load(f)
+            return JsonResponse(manifest_data)
+    return JsonResponse({}, status=404)

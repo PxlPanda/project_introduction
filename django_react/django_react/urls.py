@@ -1,17 +1,24 @@
-from django.urls import path
+from django.urls import path, re_path, include
 from . import views
 from . import settings
+from rest_framework_simplejwt.views import TokenRefreshView
+import os
 
 urlpatterns = [
-    path('', views.index, name='index'),
-    path('signin/', views.signin, name='signin'),
-    path('login/', views.login_user, name='login_user'),
-    path('static/<path:path>', views.serve_static, name='static'),  # Обработчик для статики
-    path('api/halls/', views.get_halls, name='get_halls'),
-    path('api/register/teacher/', views.register_teacher, name='register_teacher'),
-    path('api/register/student/', views.register_student, name='register_student'),
+    # API endpoints
+    path('api/', include('leads.urls')),  # Включаем все URL из leads.urls
+    
+    # JWT refresh token endpoint
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # Static files
+    path('manifest.json', views.serve_manifest, name='serve_manifest'),
+    
+    # React app catch-all
+    re_path(r'^.*$', views.index, name='index'),
 ]
 
 if settings.DEBUG:
     from django.conf.urls.static import static
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static('/', document_root=os.path.join(settings.REACT_APP_DIR, 'public'))

@@ -1,26 +1,21 @@
 # leads/urls.py
 
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from . import views
 
+router = DefaultRouter()
+router.register(r'register', views.RegistrationView, basename='register')
+router.register(r'locations', views.LocationViewSet)
+router.register(r'halls', views.HallViewSet)
+router.register(r'pinned-halls', views.PinnedHallViewSet, basename='pinned-halls')
+router.register(r'bookings', views.BookingViewSet, basename='bookings')
+router.register(r'points-history', views.PointsHistoryViewSet, basename='points-history')
+
 urlpatterns = [
-    # Получение списков
-    path('students/', views.get_students, name='get_students'),
-    path('teachers/', views.get_teachers, name='get_teachers'),
-    
-    # Создание записей
-    path('create/student/', views.create_student, name='create_student'),
-    path('create/teacher/', views.create_teacher, name='create_teacher'),
-    
-    # Новый эндпоинт для регистрации
-    path('register/student/', views.register_student, name='register_student'),  # Для регистрации студента
-    path('register/teacher/', views.register_teacher, name='register_teacher'),  # Для регистрации преподавателя
-    
-    # Обновление записей
-    path('update/student/<int:student_id>/', views.update_student, name='update_student'),
-    path('update/teacher/<int:teacher_id>/', views.update_teacher, name='update_teacher'),
-    
-    # Удаление записей
-    path('delete/student/<int:student_id>/', views.delete_student, name='delete_student'),
-    path('delete/teacher/<int:teacher_id>/', views.delete_teacher, name='delete_teacher'),
+    path('', include(router.urls)),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('users/me/', views.current_user, name='current-user'),
 ]

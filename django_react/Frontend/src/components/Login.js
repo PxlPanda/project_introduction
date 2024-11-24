@@ -1,134 +1,319 @@
-import React, { useState } from 'react';
-import { useFormAndValidation } from '../utils/customHooks/useFormAndValidation.js';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Login.css';
-import FormInput from './FormInput.js';
-import Checkbox from './Checkbox.js';
 
 function Login({ onLogin }) {
-  const {
-    values,
-    handleChange,
-    errors,
-    isInputValid,
-    resetForm,
-    isSubmitButtonActive,
-    getInputNames,
-  } = useFormAndValidation();
-
-  const [teacherLoginChecked, setTeacherLoginChecked] = useState(false);
-  const [responseMessage, setResponseMessage] = useState(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-
-  const loginPlaceHolder = teacherLoginChecked ? 'ФИО' : 'Email';
-  const loginPattern = teacherLoginChecked
-  ? '^[А-ЯЁа-яё]+\\s[А-ЯЁа-яё]\\.[А-ЯЁа-яё]\\.$'
-  : '^[a-zA-Z0-9._%+-]+@edu\.misis\.ru$/';  // Паттерн для email с edu.misis.ru
-
-  const loginTitle = teacherLoginChecked
-    ? 'Формат ФИО: Фамилия И.О.'
-    : 'example@edu.misis.ru';  // Заголовок с примером email
-
-  const inputElements = [
-    {
-      id: 1,
-      type: 'text',
-      name: 'loginInput',
-      className: 'login__input',
-      required: true,
-      pattern: loginPattern,
-      title: loginTitle,
-      placeholder: loginPlaceHolder,
-    },
-    {
-      id: 2,
-      type: 'password',
-      name: 'loginPassword',
-      className: 'login__input',
-      required: true,
-      placeholder: 'Пароль',
-      minLength: 7,
-    },
-  ];
-
-  const gatherLoginData = () => ({
-    // Если преподаватель, это ФИО, если студент — email
-    email: values.loginInput || '',  
-    password: values.loginPassword || '',
+  const [isStudent, setIsStudent] = useState(true);
+  const [isRegistration, setIsRegistration] = useState(false);
+  const formRef = useRef(null);
+  const [formValue, setFormValue] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    studentNumber: '',
+    groupName: ''
   });
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isValid, setIsValid] = useState({
+    email: true,
+    password: true,
+    fullName: true,
+    studentNumber: true,
+    groupName: true
+  });
+  const navigate = useNavigate();
 
-  const handleSubmit = async (ev, isFirstLogin = false) => {
-    ev.preventDefault();
-    const loginDetails = gatherLoginData();
-    const url = isFirstLogin
-      ? '/api/register/teacher/'  // URL для регистрации преподавателя
-      : '/api/register/student/';  // URL для регистрации студента
+  useEffect(() => {
+    // Добавляем класс visible ко всем контейнерам с задержкой
+    const containers = formRef.current.querySelectorAll('.login__input-container');
+    containers.forEach((container, index) => {
+      setTimeout(() => {
+        container.classList.add('visible');
+      }, index * 100);
+    });
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginDetails),
-      });
+    // Добавляем класс visible к кнопкам
+    const buttons = formRef.current.querySelector('.login__buttons');
+    setTimeout(() => {
+      buttons.classList.add('visible');
+    }, containers.length * 100);
+  }, [isStudent, isRegistration]);
 
-      const data = await response.json();
-      setResponseMessage(data.message || 'Что-то пошло не так');
-      setIsSuccess(response.ok);
-    } catch {
-      setResponseMessage('Ошибка соединения с сервером');
-      setIsSuccess(false);
-    } finally {
-      resetForm();
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormValue(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
+
+    validateField(name, value);
+  }
+
+  const validateField = (name, value) => {
+    let isFieldValid = true;
+    
+    switch (name) {
+      case 'email':
+        if (isStudent) {
+          const emailRegex = /^[^\s@]+@edu\.misis\.ru$/;
+          isFieldValid = emailRegex.test(value);
+        }
+        break;
+      case 'password':
+        isFieldValid = value.length >= 6;
+        break;
+      case 'fullName':
+        const nameRegex = /^[A-ZА-Я][a-zа-я]+ [A-ZА-Я][a-zа-я]+ [A-ZА-Я][a-zа-я]+$/;
+        isFieldValid = nameRegex.test(value);
+        break;
+      case 'studentNumber':
+        if (isStudent && isRegistration) {
+          const studentNumberRegex = /^[A-ZА-Я]\d{8}$/;
+          isFieldValid = studentNumberRegex.test(value);
+        }
+        break;
+      case 'groupName':
+        if (isStudent && isRegistration) {
+          const groupRegex = /^[A-ZА-Я]{4}-\d{2}-\d{2}$/;
+          isFieldValid = groupRegex.test(value);
+        }
+        break;
+      default:
+        break;
     }
-  };
+
+    setIsValid(prevState => ({
+      ...prevState,
+      [name]: isFieldValid
+    }));
+
+    return isFieldValid;
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+
+    let requiredFields = [];
+    
+    if (isStudent) {
+      requiredFields.push('email', 'password');
+      if (isRegistration) {
+        requiredFields.push('studentNumber', 'groupName', 'fullName');
+      }
+    } else {
+      requiredFields.push('fullName', 'password');
+    }
+
+    const isFormValid = requiredFields.every(field => {
+      const isFieldValid = validateField(field, formValue[field]);
+      return isFieldValid && formValue[field];
+    });
+
+    if (!isFormValid) {
+      const message = formRef.current.querySelector('.login__message');
+      message.classList.add('visible');
+      setErrorMessage('Пожалуйста, корректно заполните все поля');
+      return;
+    }
+
+    onLogin();
+    navigate('/main');
+  }
+
+  const toggleUserType = () => {
+    // Сначала скрываем все элементы
+    const containers = formRef.current.querySelectorAll('.login__input-container');
+    const buttons = formRef.current.querySelector('.login__buttons');
+    const message = formRef.current.querySelector('.login__message');
+    
+    containers.forEach(container => container.classList.remove('visible'));
+    buttons.classList.remove('visible');
+    if (message) message.classList.remove('visible');
+
+    // После анимации исчезновения меняем состояние
+    setTimeout(() => {
+      setIsStudent(!isStudent);
+      setErrorMessage('');
+      setFormValue({
+        email: '',
+        password: '',
+        fullName: '',
+        studentNumber: '',
+        groupName: ''
+      });
+      setIsValid({
+        email: true,
+        password: true,
+        fullName: true,
+        studentNumber: true,
+        groupName: true
+      });
+    }, 300);
+  }
+
+  const toggleRegistration = () => {
+    // Сначала скрываем все элементы
+    const containers = formRef.current.querySelectorAll('.login__input-container');
+    const buttons = formRef.current.querySelector('.login__buttons');
+    const message = formRef.current.querySelector('.login__message');
+    
+    containers.forEach(container => container.classList.remove('visible'));
+    buttons.classList.remove('visible');
+    if (message) message.classList.remove('visible');
+
+    // После анимации исчезновения меняем состояние
+    setTimeout(() => {
+      setIsRegistration(!isRegistration);
+      setErrorMessage('');
+      setFormValue({
+        email: '',
+        password: '',
+        fullName: '',
+        studentNumber: '',
+        groupName: ''
+      });
+      setIsValid({
+        email: true,
+        password: true,
+        fullName: true,
+        studentNumber: true,
+        groupName: true
+      });
+    }, 300);
+  }
 
   return (
-    <section className="login">
-      <form name="loginForm" className="login__form" noValidate>
-        <h2 className="login__title">Вход</h2>
-        {inputElements.map((input) => (
-          <FormInput
-            key={input.id}
-            {...input}
-            value={values[input.name] || ''}
-            isInputValid={isInputValid[input.name]}
-            errorMessageText={errors[input.name]}
-            onChange={handleChange}
-          />
-        ))}
-        <Checkbox
-          label="Войти как преподаватель"
-          value={teacherLoginChecked}
-          onChange={() => {
-            setTeacherLoginChecked(!teacherLoginChecked);
-            resetForm();  // Сбросить форму при смене типа входа
-          }}
-        />
-        <span className="login__format-text">{loginTitle}</span>
-        <div className="login__button-container">
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e, false)}
-            disabled={!isSubmitButtonActive}
-            className={`login__button ${!isSubmitButtonActive && 'login__button_disabled'}`}
-          >
-            Войти
-          </button>
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e, true)}
-            disabled={!isSubmitButtonActive}
-            className={`login__button ${!isSubmitButtonActive && 'login__button_disabled'}`}
-          >
-            Первый вход
-          </button>
-        </div>
-        {responseMessage && (
-          <div className={`response-message ${isSuccess ? 'success' : 'error'}`}>
-            {responseMessage}
+    <div className="login">
+      <div className="login__form-wrapper">
+        <form className="login__form" onSubmit={handleSubmit} noValidate ref={formRef}>
+          <h2 className="login__title">
+            {isRegistration ? (isStudent ? 'Регистрация студента' : 'Регистрация преподавателя') 
+                          : (isStudent ? 'Вход для студента' : 'Вход для преподавателя')}
+          </h2>
+          
+          {isStudent ? (
+            <div className="login__input-container">
+              <input
+                className={`login__input ${!isValid.email ? 'invalid' : ''}`}
+                type="email"
+                name="email"
+                value={formValue.email}
+                onChange={handleChange}
+                placeholder="Email @edu.misis.ru"
+                required
+              />
+              <span className="login__input-hint">Используйте корпоративную почту @edu.misis.ru</span>
+            </div>
+          ) : (
+            <div className="login__input-container">
+              <input
+                className={`login__input ${!isValid.fullName ? 'invalid' : ''}`}
+                type="text"
+                name="fullName"
+                value={formValue.fullName}
+                onChange={handleChange}
+                placeholder="ФИО"
+                required
+              />
+              <span className="login__input-hint">Введите полное ФИО (Иванов Иван Иванович)</span>
+            </div>
+          )}
+
+          <div className="login__input-container">
+            <input
+              className={`login__input ${!isValid.password ? 'invalid' : ''}`}
+              type="password"
+              name="password"
+              value={formValue.password}
+              onChange={handleChange}
+              placeholder="Пароль"
+              required
+            />
+            <span className="login__input-hint">Минимум 6 символов</span>
           </div>
-        )}
-      </form>
-    </section>
+
+          {isRegistration && (
+            <>
+              {!isStudent && (
+                <div className="login__input-container">
+                  <input
+                    className={`login__input ${!isValid.fullName ? 'invalid' : ''}`}
+                    type="text"
+                    name="fullName"
+                    value={formValue.fullName}
+                    onChange={handleChange}
+                    placeholder="ФИО"
+                    required
+                  />
+                  <span className="login__input-hint">Введите полное ФИО</span>
+                </div>
+              )}
+
+              {isStudent && (
+                <>
+                  <div className="login__input-container">
+                    <input
+                      className={`login__input ${!isValid.studentNumber ? 'invalid' : ''}`}
+                      type="text"
+                      name="studentNumber"
+                      value={formValue.studentNumber}
+                      onChange={handleChange}
+                      placeholder="Номер студенческого"
+                      required
+                    />
+                    <span className="login__input-hint">Формат: А12345678</span>
+                  </div>
+
+                  <div className="login__input-container">
+                    <input
+                      className={`login__input ${!isValid.groupName ? 'invalid' : ''}`}
+                      type="text"
+                      name="groupName"
+                      value={formValue.groupName}
+                      onChange={handleChange}
+                      placeholder="Группа"
+                      required
+                    />
+                    <span className="login__input-hint">Формат: АБВГ-00-00</span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          <div className="login__buttons">
+            <button
+              className="login__button login__button_submit"
+              type="submit"
+              disabled={Object.values(isValid).some(valid => !valid)}
+            >
+              {isRegistration ? 'Зарегистрироваться' : 'Войти'}
+            </button>
+            <button
+              className="login__button login__button_switch"
+              type="button"
+              onClick={toggleUserType}
+            >
+              {isStudent ? 'Войти как преподаватель' : 'Войти как студент'}
+            </button>
+            <button
+              className="login__button login__button_switch"
+              type="button"
+              onClick={toggleRegistration}
+            >
+              {isRegistration ? 'Уже есть аккаунт? Войти' : 'Создать аккаунт'}
+            </button>
+          </div>
+
+          {errorMessage && (
+            <div className="login__message login__message_error">
+              {errorMessage}
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
   );
 }
 
