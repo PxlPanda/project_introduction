@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './main.css';
 
 const HALLS = {
-  'Горный': [
+  'gorny': [
     {
       id: 1,
       name: 'Тренажерный зал',
@@ -32,7 +32,7 @@ const HALLS = {
       currentCapacity: 6
     }
   ],
-  'Беляево': [
+  'belyaevo': [
     {
       id: 5,
       name: 'Бассейн',
@@ -70,7 +70,7 @@ const USER_DATA = {
 };
 
 const Main = () => {
-  const [selectedLocation, setSelectedLocation] = useState('Горный');
+  const [selectedLocation, setSelectedLocation] = useState('gorny');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTimes, setSelectedTimes] = useState({});
   const [bookings, setBookings] = useState(USER_DATA.bookings);
@@ -172,7 +172,7 @@ const Main = () => {
   };
 
   const getLocationForHall = (hallName) => {
-    if (HALLS['Горный'].some(h => h.name === hallName)) {
+    if (HALLS['gorny'].some(h => h.name === hallName)) {
       return 'Горный';
     }
     return 'Беляево';
@@ -181,6 +181,23 @@ const Main = () => {
   const handleLogout = () => {
     localStorage.removeItem('userData');
     window.location.href = '/login';
+  };
+
+  const handleLocationChange = (location) => {
+    setSelectedLocation(location);
+  };
+
+  const days = getDays().map((date, index) => ({
+    date: getDateString(date),
+    weekday: getDayName(date),
+    isToday: date.toDateString() === new Date().toDateString()
+  }));
+
+  const [selectedDay, setSelectedDay] = useState(0);
+
+  const handleDayChange = (dayIndex) => {
+    setSelectedDay(dayIndex);
+    setSelectedDate(days[dayIndex]);
   };
 
   return (
@@ -208,46 +225,44 @@ const Main = () => {
 
       <nav className="navigation-container">
         <div className="nav-content">
-          <div className="nav-left">
-            <div className="location-buttons">
-              <button
-                className={`location-button ${selectedLocation === 'Горный' ? 'active' : ''}`}
-                onClick={() => setSelectedLocation('Горный')}
-              >
-                Горный
-              </button>
-              <button
-                className={`location-button ${selectedLocation === 'Беляево' ? 'active' : ''}`}
-                onClick={() => setSelectedLocation('Беляево')}
-              >
-                Беляево
-              </button>
-            </div>
-
-            <div className="days-container">
-              {getDays().map((date) => (
+          <div className="nav-layout">
+            <div className="nav-main">
+              <div className="location-buttons">
                 <button
-                  key={date.toISOString()}
-                  className={`day-button ${
-                    selectedDate.toDateString() === date.toDateString() ? 'selected' : ''
-                  } ${
-                    date.toDateString() === new Date().toDateString() ? 'today' : ''
-                  }`}
-                  onClick={() => setSelectedDate(date)}
+                  className={`location-button ${selectedLocation === 'gorny' ? 'active' : ''}`}
+                  onClick={() => handleLocationChange('gorny')}
                 >
-                  <span className="date">{getDateString(date)}</span>
-                  <span className="weekday">{getDayName(date)}</span>
+                  Горный
                 </button>
-              ))}
+                <button
+                  className={`location-button ${selectedLocation === 'belyaevo' ? 'active' : ''}`}
+                  onClick={() => handleLocationChange('belyaevo')}
+                >
+                  Беляево
+                </button>
+              </div>
+              
+              <div className="days-container">
+                {days.map((day, index) => (
+                  <button
+                    key={index}
+                    className={`day-button ${selectedDay === index ? 'selected' : ''} ${day.isToday ? 'today' : ''}`}
+                    onClick={() => handleDayChange(index)}
+                  >
+                    <span className="date">{day.date}</span>
+                    <span className="weekday">{day.weekday}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="profile-data">
-            <h3>Профиль</h3>
-            <div className="profile-info">
-              <p><strong>ФИО:</strong> {USER_DATA.name}</p>
-              <p><strong>Группа:</strong> {USER_DATA.group}</p>
-              <p><strong>Студ. билет:</strong> {USER_DATA.studentId}</p>
+            <div className="profile-data">
+              <h3>Профиль</h3>
+              <div className="profile-info">
+                <p><strong>ФИО:</strong> {USER_DATA.name}</p>
+                <p><strong>Группа:</strong> {USER_DATA.group}</p>
+                <p><strong>Студ. билет:</strong> {USER_DATA.studentId}</p>
+              </div>
             </div>
           </div>
         </div>
