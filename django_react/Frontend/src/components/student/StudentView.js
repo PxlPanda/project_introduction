@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../styles/base.css';
 import '../styles/navigation.css';
 import '../styles/hall-card.css';
@@ -126,6 +126,8 @@ const StudentView = () => {
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState(0); // 0 - текущая неделя, 1 - следующая
   const [userData, setUserData] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     const savedUserData = localStorage.getItem('userData');
@@ -151,6 +153,12 @@ const StudentView = () => {
       setSelectedTimes({}); // Сбрасываем выбранное время
     }
   }, [selectedWeek]);
+
+  useEffect(() => {
+    if (showHistory && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showHistory]);
 
   const getDayName = (date) => {
     if (!(date instanceof Date)) return '';
@@ -342,6 +350,21 @@ const StudentView = () => {
     }
   ];
 
+  // Функция для фильтрации записей истории
+  const filteredHistory = pointsHistory.filter(record => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      record.type.toLowerCase().includes(searchLower) ||
+      record.location.toLowerCase().includes(searchLower) ||
+      record.comment?.toLowerCase().includes(searchLower) ||
+      new Date(record.date).toLocaleDateString('ru-RU', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }).toLowerCase().includes(searchLower)
+    );
+  });
+
   // Функция для проверки и обновления недель
   const updateWeeks = () => {
     const now = new Date();
@@ -436,7 +459,10 @@ const StudentView = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ margin: 0, color: '#333' }}>История баллов</h2>
           <button 
-            onClick={() => setShowHistory(false)}
+            onClick={() => {
+              setShowHistory(false);
+              setSearchQuery('');
+            }}
             style={{
               background: 'none',
               border: 'none',
@@ -449,36 +475,62 @@ const StudentView = () => {
             ×
           </button>
         </div>
-        {pointsHistory.map(record => (
-          <div key={record.id} style={{
-            padding: '12px',
-            borderBottom: '1px solid #eee',
-            marginBottom: '8px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontWeight: 'bold', color: '#333' }}>{record.type}</span>
-              <span style={{ color: '#1976d2' }}>+{record.points} балла</span>
-            </div>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              <div>{record.location}</div>
-              <div>{new Date(record.date).toLocaleDateString('ru-RU', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}</div>
-            </div>
-            {record.comment && (
-              <div style={{ 
-                marginTop: '8px',
-                fontSize: '14px',
-                color: '#666',
-                fontStyle: 'italic'
-              }}>
-                {record.comment}
-              </div>
-            )}
+
+        <div style={{ marginBottom: '20px' }}>
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск по истории..."
+            autoFocus
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '14px',
+              outline: 'none'
+            }}
+          />
+        </div>
+
+        {filteredHistory.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
+            Ничего не найдено
           </div>
-        ))}
+        ) : (
+          filteredHistory.map(record => (
+            <div key={record.id} style={{
+              padding: '12px',
+              borderBottom: '1px solid #eee',
+              marginBottom: '8px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 'bold', color: '#333' }}>{record.type}</span>
+                <span style={{ color: '#1976d2' }}>+{record.points} балла</span>
+              </div>
+              <div style={{ fontSize: '14px', color: '#666' }}>
+                <div>{record.location}</div>
+                <div>{new Date(record.date).toLocaleDateString('ru-RU', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}</div>
+              </div>
+              {record.comment && (
+                <div style={{ 
+                  marginTop: '8px',
+                  fontSize: '14px',
+                  color: '#666',
+                  fontStyle: 'italic'
+                }}>
+                  {record.comment}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
