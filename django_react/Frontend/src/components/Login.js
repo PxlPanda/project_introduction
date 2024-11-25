@@ -39,12 +39,39 @@ function Login({ onLogin }) {
     }, containers.length * 100);
   }, [isStudent, isRegistration]);
 
+  useEffect(() => {
+    // Проверяем, есть ли сохраненная сессия
+    const savedUser = localStorage.getItem('userData');
+    if (savedUser) {
+      onLogin();
+      navigate('/main');
+    }
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormValue(prevState => ({
-      ...prevState,
-      [name]: value
-    }));
+    
+    // Форматируем ФИО при вводе
+    if (name === 'fullName') {
+      // Разбиваем строку на слова
+      const words = value.split(' ');
+      // Форматируем каждое слово с заглавной буквы
+      const formattedWords = words.map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      );
+      // Объединяем обратно
+      const formattedValue = formattedWords.join(' ');
+      
+      setFormValue(prevState => ({
+        ...prevState,
+        [name]: formattedValue
+      }));
+    } else {
+      setFormValue(prevState => ({
+        ...prevState,
+        [name]: value
+      }));
+    }
 
     validateField(name, value);
   }
@@ -63,20 +90,17 @@ function Login({ onLogin }) {
         isFieldValid = value.length >= 6;
         break;
       case 'fullName':
-        const nameRegex = /^[A-ZА-Я][a-zа-я]+ [A-ZА-Я][a-zа-я]+ [A-ZА-Я][a-zа-я]+$/;
+        // Проверяем только наличие трех слов и отсутствие цифр/спецсимволов
+        const nameRegex = /^[А-ЯЁа-яё]+ [А-ЯЁа-яё]+ [А-ЯЁа-яё]+$/;
         isFieldValid = nameRegex.test(value);
         break;
       case 'studentNumber':
-        if (isStudent && isRegistration) {
-          const studentNumberRegex = /^[A-ZА-Я]\d{8}$/;
-          isFieldValid = studentNumberRegex.test(value);
-        }
+        const studentNumberRegex = /^[A-ZА-Я]\d{8}$/;
+        isFieldValid = studentNumberRegex.test(value);
         break;
       case 'groupName':
-        if (isStudent && isRegistration) {
-          const groupRegex = /^[A-ZА-Я]{4}-\d{2}-\d{2}$/;
-          isFieldValid = groupRegex.test(value);
-        }
+        const groupRegex = /^[А-ЯЁ]{4}-\d{2}-\d{2}$/;
+        isFieldValid = groupRegex.test(value);
         break;
       default:
         break;
@@ -94,29 +118,30 @@ function Login({ onLogin }) {
     e.preventDefault();
     setErrorMessage('');
 
-    let requiredFields = [];
-    
-    if (isStudent) {
-      requiredFields.push('email', 'password');
-      if (isRegistration) {
-        requiredFields.push('studentNumber', 'groupName', 'fullName');
-      }
-    } else {
-      requiredFields.push('fullName', 'password');
-    }
+    const username = isStudent ? formValue.email : formValue.fullName;
+    const password = formValue.password;
 
-    const isFormValid = requiredFields.every(field => {
-      const isFieldValid = validateField(field, formValue[field]);
-      return isFieldValid && formValue[field];
-    });
-
-    if (!isFormValid) {
+    if (!username || !password) {
       const message = formRef.current.querySelector('.login__message');
       message.classList.add('visible');
       setErrorMessage('Пожалуйста, корректно заполните все поля');
       return;
     }
 
+    // Здесь будет запрос к API для аутентификации
+    // Пока используем моковые данные
+    const userData = {
+      username: username,
+      isStudent: isStudent,
+      token: 'mock-token-' + Date.now(),
+      fullName: isStudent ? 'Студент Тестовый' : username,
+      studentId: isStudent ? 'A12345678' : null,
+      group: isStudent ? 'АБВГ-00-00' : null
+    };
+
+    // Сохраняем данные пользователя
+    localStorage.setItem('userData', JSON.stringify(userData));
+    
     onLogin();
     navigate('/main');
   }
@@ -235,7 +260,7 @@ function Login({ onLogin }) {
 
           {isRegistration && (
             <>
-              {!isStudent && (
+              {isStudent && isRegistration && (
                 <div className="login__input-container">
                   <input
                     className={`login__input ${!isValid.fullName ? 'invalid' : ''}`}
@@ -246,7 +271,7 @@ function Login({ onLogin }) {
                     placeholder="ФИО"
                     required
                   />
-                  <span className="login__input-hint">Введите полное ФИО</span>
+                  <span className="login__input-hint">Введите полное ФИО (Иванов Иван Иванович)</span>
                 </div>
               )}
 

@@ -82,10 +82,16 @@
   color: #666;
   transition: opacity 0.3s ease;
   opacity: 0;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .login__input:focus + .login__input-hint {
+  opacity: 1;
+}
+
+.login__input-hint.error {
+  color: #dc3545;
   opacity: 1;
 }
 

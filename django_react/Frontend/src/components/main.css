@@ -34,32 +34,30 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 20px;
-  background: var(--color-primary);
-  color: var(--color-white);
+  padding: 15px 20px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .app-header h1 {
   font-size: 20px;
   margin: 0;
-  color: var(--color-white);
+  color: var(--color-primary) !important;
 }
 
 .logout-button {
-  padding: 6px 12px;
-  border: 1px solid var(--color-white);
+  padding: 8px 16px;
+  border: none;
   border-radius: 4px;
-  background: transparent;
+  background-color: var(--color-primary);
   color: var(--color-white);
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s;
   font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 .logout-button:hover {
-  background: var(--color-white);
-  color: var(--color-primary);
+  background-color: var(--color-primary-light);
 }
 
 .navigation-container {
@@ -610,3 +608,22 @@ body {
 .notification-close:hover {
   color: var(--color-gray-600);
 }
+
+.app-title {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--color-primary) !important;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.misis-text {
+  font-family: 'Russo One', sans-serif;
+  background: linear-gradient(45deg, #0541f0, #37ebff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  letter-spacing: 1px;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');

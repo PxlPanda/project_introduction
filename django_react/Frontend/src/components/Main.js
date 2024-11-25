@@ -78,6 +78,20 @@ const Main = () => {
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
+    // Проверяем авторизацию при загрузке
+    const savedUserData = localStorage.getItem('userData');
+    if (!savedUserData) {
+      window.location.href = '/login';
+      return;
+    }
+
+    // Парсим данные пользователя для использования
+    const userData = JSON.parse(savedUserData);
+    // Здесь можно использовать данные пользователя
+    // Например, отображать имя, группу и т.д.
+  }, []);
+
+  useEffect(() => {
     if (notification.show) {
       const timer = setTimeout(() => {
         setNotification({ show: false, message: '' });
@@ -164,6 +178,11 @@ const Main = () => {
     return 'Беляево';
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('userData');
+    window.location.href = '/login';
+  };
+
   return (
     <div className="mobile-container">
       {notification.show && (
@@ -182,9 +201,9 @@ const Main = () => {
         </div>
       )}
 
-      <header className="app-header">
-        <h1>MISIS Booking</h1>
-        <button className="logout-button">Выйти</button>
+      <header className="app-header" style={{ background: 'white' }}>
+        <h1 className="app-title" style={{ color: '#0a1e64' }}>спорт <span className="misis-text">МИСИС</span></h1>
+        <button className="logout-button" onClick={handleLogout}>Выйти</button>
       </header>
 
       <nav className="navigation-container">
