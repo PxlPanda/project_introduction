@@ -1,0 +1,270 @@
+.hall-card {
+  width: 100%;
+  margin: 10px 0;
+  background: var(--color-white);
+  border-radius: 12px;
+  display: flex;
+  gap: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid var(--color-gray-200);
+  position: relative;
+  padding: 20px;
+}
+
+.hall-image {
+  width: 160px;
+  height: 160px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--color-gray-100);
+  flex-shrink: 0;
+}
+
+.hall-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-right: 20px;
+}
+
+.hall-title {
+  font-size: 20px;
+  margin: 0 0 20px 0;
+  font-weight: bold;
+  color: var(--color-primary);
+}
+
+.time-slots-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.time-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+}
+
+.time-slot {
+  border: 1px solid var(--color-gray-200);
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.time-slot:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary-light);
+}
+
+.time-slot.selected {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+.time-slot.disabled {
+  background: var(--color-gray-100);
+  color: var(--color-gray-400);
+  cursor: not-allowed;
+  border-color: var(--color-gray-200);
+}
+
+.hall-capacity {
+  font-size: 14px;
+  padding: 8px 0;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.hall-capacity.low {
+  color: var(--color-success);
+}
+
+.hall-capacity.medium {
+  color: var(--color-warning);
+}
+
+.hall-capacity.full {
+  color: var(--color-danger);
+}
+
+.book-button {
+  width: 100%;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: auto;
+}
+
+.book-button:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  transform: translateY(-1px);
+}
+
+.book-button:disabled {
+  background: var(--color-gray-300);
+  cursor: not-allowed;
+}
+
+.capacity-indicator {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  border-radius: 0 12px 12px 0;
+  background: var(--color-success);
+}
+
+.capacity-indicator.medium {
+  background: var(--color-warning);
+}
+
+.capacity-indicator.full {
+  background: var(--color-danger);
+}
+
+.students-list-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.students-list-content {
+  background: var(--color-white);
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.students-list-content h2 {
+  margin: 0 0 20px;
+  color: var(--color-primary);
+  font-size: 20px;
+}
+
+.search-controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.group-select {
+  padding: 8px 12px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+.students-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.student-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: var(--color-gray-50);
+  border-radius: 8px;
+}
+
+.student-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-name {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.student-group {
+  font-size: 12px;
+  color: var(--color-gray-600);
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.modal-buttons button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.modal-buttons button:first-child {
+  background: var(--color-gray-200);
+  color: var(--color-text);
+}
+
+.modal-buttons button:last-child {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.modal-buttons button:hover {
+  transform: translateY(-1px);
+}
+
+.attendance-button {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 4px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.attendance-button:hover {
+  background: var(--color-primary-light);
+}

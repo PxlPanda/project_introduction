@@ -1,0 +1,119 @@
+.navigation-container {
+  padding: 20px 20px 0;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.nav-content {
+  width: 100%;
+  margin: 0;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.nav-layout {
+  width: 100%;
+  display: flex;
+  gap: 15px;
+  box-sizing: border-box;
+}
+
+.nav-main {
+  flex: 1;
+  width: 100%;
+  margin: 0;
+}
+
+.nav-left {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+.location-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.location-button {
+  padding: 10px 20px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+.location-button:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary-light);
+}
+
+.location-button.active {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+.days-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  padding-bottom: 15px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.days-container::-webkit-scrollbar {
+  display: none;
+}
+
+.day-button {
+  padding: 8px 16px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.day-button:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary-light);
+}
+
+.day-button.selected {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+.day-button.today {
+  border-color: var(--color-accent);
+}
+
+.day-button .date {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.day-button .weekday {
+  font-size: 12px;
+  opacity: 0.8;
+  text-transform: uppercase;
+}

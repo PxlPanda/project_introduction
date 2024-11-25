@@ -1,0 +1,56 @@
+.days-container {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 10px 0;
+}
+
+.days-container::-webkit-scrollbar {
+  display: none;
+}
+
+.points-section {
+  margin-top: 20px;
+  padding: 15px;
+  background: var(--color-cream-50);
+  border-radius: 8px;
+  border: 1px solid var(--color-cream-200);
+}
+
+.points-section h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+.points-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.points-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.points-list li:last-child {
+  margin-bottom: 0;
+}
+
+.points-list li::before {
+  content: "•";
+  color: var(--color-primary);
+  font-size: 18px;
+  line-height: 1;
+}

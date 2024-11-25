@@ -1,0 +1,118 @@
+.logout-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.logout-button:hover {
+  background-color: var(--color-primary-light);
+}
+
+.location-button {
+  padding: 10px 24px;
+  font-size: 16px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 8px;
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 120px;
+  font-weight: 500;
+}
+
+.location-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.location-button.active {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+.day-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--color-gray-200);
+  min-width: 65px;
+  border-radius: 8px;
+  background: var(--color-white);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.day-button .date {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.day-button .weekday {
+  font-size: 12px;
+  color: var(--color-text);
+  opacity: 0.8;
+}
+
+.day-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-primary-light);
+}
+
+.day-button.selected {
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-accent));
+  border: none;
+  box-shadow: 0 4px 12px rgba(5, 65, 240, 0.2);
+}
+
+.day-button.selected .date,
+.day-button.selected .weekday {
+  color: var(--color-white);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.day-button.today {
+  position: relative;
+  overflow: hidden;
+}
+
+.day-button.today::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary-light), var(--color-accent));
+  border-radius: 3px 3px 0 0;
+}
+
+.presence-button {
+  padding: 6px 12px;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 4px;
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.presence-button:hover {
+  background: var(--color-gray-100);
+}
+
+.presence-button.present {
+  background: var(--color-success);
+  color: white;
+}
