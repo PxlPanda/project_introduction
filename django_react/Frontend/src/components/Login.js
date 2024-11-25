@@ -128,18 +128,23 @@ function Login({ onLogin }) {
       return;
     }
 
-    // Здесь будет запрос к API для аутентификации
-    // Пока используем моковые данные
-    const userData = {
-      username: username,
-      isStudent: isStudent,
-      token: 'mock-token-' + Date.now(),
-      fullName: isStudent ? 'Студент Тестовый' : username,
-      studentId: isStudent ? 'A12345678' : null,
-      group: isStudent ? 'АБВГ-00-00' : null
-    };
+    // Создаем разные данные для студента и преподавателя
+    const userData = isStudent 
+      ? {
+          type: 'student',
+          name: formValue.fullName || 'Студент Тестовый',
+          group: formValue.groupName || 'БПМ-20-1',
+          studentId: formValue.studentNumber || 'A12345678',
+          points: 75,
+          maxPoints: 100
+        }
+      : {
+          type: 'teacher',
+          name: formValue.fullName || 'Преподаватель Тестовый'
+        };
 
-    // Сохраняем данные пользователя
+    // Сохраняем тип пользователя и данные
+    localStorage.setItem('userType', isStudent ? 'student' : 'teacher');
     localStorage.setItem('userData', JSON.stringify(userData));
     
     onLogin();

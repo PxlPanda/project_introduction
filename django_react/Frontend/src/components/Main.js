@@ -81,32 +81,116 @@ const Main = () => {
   const [notification, setNotification] = useState({ show: false, message: '' });
   const [showHistory, setShowHistory] = useState(false);
   const [selectedDay, setSelectedDay] = useState(0);
+  const [showStudentsList, setShowStudentsList] = useState(false);
+  const [studentsForTimeSlot, setStudentsForTimeSlot] = useState([]);
+  const [searchName, setSearchName] = useState('');
+  const [searchGroup, setSearchGroup] = useState('');
+
+  // Получаем данные пользователя из localStorage при загрузке
+  const [userType, setUserType] = useState(localStorage.getItem('userType'));
+  const [userData, setUserData] = useState(() => {
+    const data = localStorage.getItem('userData');
+    return data ? JSON.parse(data) : null;
+  });
 
   useEffect(() => {
     // Проверяем авторизацию при загрузке
+    const savedUserType = localStorage.getItem('userType');
     const savedUserData = localStorage.getItem('userData');
-    if (!savedUserData) {
+    
+    if (!savedUserType || !savedUserData) {
       window.location.href = '/login';
       return;
     }
 
-    // Парсим данные пользователя для использования
-    const userData = JSON.parse(savedUserData);
-    // Здесь можно использовать данные пользователя
-    // Например, отображать имя, группу и т.д.
+    setUserType(savedUserType);
+    setUserData(JSON.parse(savedUserData));
   }, []);
 
-  useEffect(() => {
-    if (notification.show) {
-      const timer = setTimeout(() => {
-        setNotification({ show: false, message: '' });
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification.show]);
+  const timeSlots = [
+    "09:00", "10:50", "12:40", "14:30", "16:20", "18:10"
+  ];
 
-  const showNotification = (message) => {
-    setNotification({ show: true, message });
+  // Функция для отметки посещаемости
+  const handleMarkAttendance = (hall) => {
+    setShowStudentsList(true);
+    setStudentsForTimeSlot([
+      { id: 1, name: 'Иванов Иван', group: 'БПМ-20-1', present: false },
+      { id: 2, name: 'Петров Петр', group: 'БПМ-20-2', present: false },
+      { id: 3, name: 'Сидоров Сидор', group: 'БПМ-20-1', present: false },
+    ]);
+  };
+
+  // Компонент списка студентов
+  const StudentsList = () => {
+    // Получаем уникальные группы
+    const uniqueGroups = [...new Set(studentsForTimeSlot.map(student => student.group))];
+    
+    // Фильтрация студентов
+    const filteredStudents = studentsForTimeSlot.filter(student => 
+      student.name.toLowerCase().includes(searchName.toLowerCase()) &&
+      (searchGroup === '' || student.group === searchGroup)
+    );
+
+    return (
+      <div className="students-list-modal">
+        <div className="students-list-content">
+          <h2>Список студентов</h2>
+          
+          <div className="search-controls">
+            <input
+              type="text"
+              placeholder="Поиск по ФИО"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              className="search-input"
+              autoComplete="off"
+            />
+            <select
+              value={searchGroup}
+              onChange={(e) => setSearchGroup(e.target.value)}
+              className="group-select"
+            >
+              <option value="">Все группы</option>
+              {uniqueGroups.map(group => (
+                <option key={group} value={group}>{group}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="students-table">
+            {filteredStudents.map(student => (
+              <div key={student.id} className="student-row">
+                <div className="student-info">
+                  <span className="student-name">{student.name}</span>
+                  <span className="student-group">{student.group}</span>
+                </div>
+                <button 
+                  className={`presence-button ${student.present ? 'present' : ''}`}
+                  onClick={() => {
+                    setStudentsForTimeSlot(students =>
+                      students.map(s =>
+                        s.id === student.id ? { ...s, present: !s.present } : s
+                      )
+                    );
+                  }}
+                >
+                  Присутствует
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="modal-buttons">
+            <button onClick={() => setShowStudentsList(false)}>Закрыть</button>
+            <button onClick={() => {
+              setShowStudentsList(false);
+              showNotification('Посещаемость сохранена');
+            }}>Сохранить</button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const getDayName = (date) => {
@@ -174,16 +258,21 @@ const Main = () => {
   }, []);
 
   const handleTimeChange = (hallId, direction) => {
-    const currentTime = selectedTimes[hallId] || '10:00';
-    const [hours] = currentTime.split(':').map(Number);
+    const currentTime = selectedTimes[hallId] || timeSlots[0];
+    const currentIndex = timeSlots.indexOf(currentTime);
     
-    let newHours = direction === 'next' ? hours + 2 : hours - 2;
-    if (newHours < 10) newHours = 20;
-    if (newHours > 20) newHours = 10;
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = currentIndex + 1;
+      if (newIndex >= timeSlots.length) newIndex = 0;
+    } else {
+      newIndex = currentIndex - 1;
+      if (newIndex < 0) newIndex = 0; // Предотвращаем переход к последнему времени
+    }
     
     setSelectedTimes({
       ...selectedTimes,
-      [hallId]: `${newHours}:00`
+      [hallId]: timeSlots[newIndex]
     });
   };
 
@@ -236,6 +325,19 @@ const Main = () => {
   const handleLocationChange = (location) => {
     setSelectedLocation(location);
   };
+
+  const showNotification = (message) => {
+    setNotification({ show: true, message });
+  };
+
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification({ show: false, message: '' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification.show]);
 
   return (
     <div className="mobile-container">
@@ -294,11 +396,30 @@ const Main = () => {
             </div>
 
             <div className="profile-data">
-              <h3>Профиль</h3>
+              <h3>Профиль <span className="user-type">
+                {userType === 'teacher' ? 'Преподаватель' : 'Студент'}
+              </span></h3>
               <div className="profile-info">
-                <p><strong>ФИО:</strong> {USER_DATA.name}</p>
-                <p><strong>Группа:</strong> {USER_DATA.group}</p>
-                <p><strong>Студ. билет:</strong> {USER_DATA.studentId}</p>
+                <p><strong>ФИО:</strong> {userData?.name}</p>
+                {userType === 'student' && userData && (
+                  <>
+                    <p><strong>Группа:</strong> {userData.group}</p>
+                    <p><strong>Студ. билет:</strong> {userData.studentId}</p>
+                    <div className="points-progress">
+                      <div className="points-bar">
+                        <div 
+                          className="points-fill"
+                          style={{
+                            width: `${(userData.points / userData.maxPoints) * 100}%`
+                          }}
+                        />
+                      </div>
+                      <div className="points-text">
+                        {userData.points} / {userData.maxPoints}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -309,67 +430,59 @@ const Main = () => {
         <section className="halls-section">
           {HALLS[selectedLocation].map((hall) => (
             <div key={hall.id} className="hall-card">
-              <div className="hall-image">
-                <img src={hall.image} alt={hall.name} />
-              </div>
+              <img src={hall.image} alt={hall.name} className="hall-image" />
               <div className="hall-content">
                 <div className="hall-header">
                   <h3 className="hall-name">{hall.name}</h3>
                   <div className="capacity-indicator">
                     <div className="capacity-bar">
-                      <div
+                      <div 
                         className="capacity-fill"
                         style={{
                           width: `${(hall.currentCapacity / hall.capacity) * 100}%`,
-                          backgroundColor:
-                            (hall.currentCapacity / hall.capacity) > 0.8
-                              ? 'var(--color-danger)'
-                              : (hall.currentCapacity / hall.capacity) > 0.5
-                              ? 'var(--color-warning)'
-                              : 'var(--color-success)'
+                          backgroundColor: `${hall.currentCapacity >= hall.capacity ? 'var(--color-danger)' : 'var(--color-success)'}`
                         }}
                       />
                     </div>
-                    <span className="capacity-text">
-                      {hall.currentCapacity}/{hall.capacity}
-                    </span>
+                    <span className="capacity-text">{hall.currentCapacity}</span>
                   </div>
                 </div>
 
-                <div className="time-control">
-                  <button
-                    className="time-nav-button"
-                    onClick={() => handleTimeChange(hall.id, 'prev')}
+                {userType === 'teacher' ? (
+                  <button 
+                    className="mark-button"
+                    onClick={() => handleMarkAttendance(hall)}
                   >
-                    ←
+                    Отметить
                   </button>
-                  <span className="time-display">
-                    {selectedTimes[hall.id] || '10:00'}
-                  </span>
-                  <button
-                    className="time-nav-button"
-                    onClick={() => handleTimeChange(hall.id, 'next')}
-                  >
-                    →
-                  </button>
-                </div>
-
-                <button
-                  className={`book-button ${
-                    isSlotBooked(hall, selectedTimes[hall.id])
-                      ? 'booked'
-                      : ''
-                  }`}
-                  onClick={() => handleBooking(hall)}
-                  disabled={
-                    hall.currentCapacity >= hall.capacity ||
-                    isSlotBooked(hall, selectedTimes[hall.id])
-                  }
-                >
-                  {isSlotBooked(hall, selectedTimes[hall.id])
-                    ? 'Записано'
-                    : 'Записаться'}
-                </button>
+                ) : (
+                  <>
+                    <div className="time-control">
+                      <button 
+                        className="time-nav-button"
+                        onClick={() => handleTimeChange(hall.id, 'prev')}
+                      >
+                        ←
+                      </button>
+                      <span className="time-display">
+                        {selectedTimes[hall.id] || timeSlots[0]}
+                      </span>
+                      <button 
+                        className="time-nav-button"
+                        onClick={() => handleTimeChange(hall.id, 'next')}
+                      >
+                        →
+                      </button>
+                    </div>
+                    <button
+                      className={`book-button ${isSlotBooked(hall) ? 'booked' : ''}`}
+                      onClick={() => handleBooking(hall)}
+                      disabled={hall.currentCapacity >= hall.capacity || isSlotBooked(hall)}
+                    >
+                      {isSlotBooked(hall) ? 'Записаны' : 'Записаться'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -384,12 +497,12 @@ const Main = () => {
                 <div 
                   className="points-fill"
                   style={{
-                    width: `${(USER_DATA.points / USER_DATA.maxPoints) * 100}%`
+                    width: `${(userData.points / userData.maxPoints) * 100}%`
                   }}
                 />
               </div>
               <div className="points-text">
-                {USER_DATA.points} / {USER_DATA.maxPoints}
+                {userData.points} / {userData.maxPoints}
               </div>
             </div>
           </div>
@@ -419,6 +532,7 @@ const Main = () => {
           </div>
         </aside>
       </main>
+      {showStudentsList && <StudentsList />}
     </div>
   );
 };
