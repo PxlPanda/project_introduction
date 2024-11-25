@@ -1,6 +1,7 @@
 from django.urls import path, re_path, include
+from django.views.static import serve
 from . import views
-from . import settings
+from django.conf import settings
 from rest_framework_simplejwt.views import TokenRefreshView
 import os
 
@@ -13,6 +14,9 @@ urlpatterns = [
     
     # Static files
     path('manifest.json', views.serve_manifest, name='serve_manifest'),
+    path('logo192.png', lambda request: serve(request, os.path.join('public', 'logo192.png'), document_root=settings.REACT_APP_DIR)),
+    path('logo512.png', lambda request: serve(request, os.path.join('public', 'logo512.png'), document_root=settings.REACT_APP_DIR)),
+    path('favicon.ico', lambda request: serve(request, os.path.join('public', 'favicon.ico'), document_root=settings.REACT_APP_DIR)),
     
     # React app catch-all
     re_path(r'^.*$', views.index, name='index'),

@@ -19,8 +19,8 @@ from django.shortcuts import render
 
 def index(request):
     try:
-        with open(os.path.join(settings.REACT_APP_DIR, 'build', 'index.html')) as f:
-            return HttpResponse(f.read())
+        with open(os.path.join(settings.REACT_APP_DIR, 'build', 'index.html'), encoding='utf-8') as f:
+            return HttpResponse(f.read(), content_type='text/html; charset=utf-8')
     except FileNotFoundError:
         return HttpResponse(
             """
@@ -29,6 +29,7 @@ def index(request):
             run `npm run build` to test the production version.
             """,
             status=501,
+            content_type='text/html; charset=utf-8'
         )
 
 # Регистрация преподавателя
@@ -178,10 +179,24 @@ def get_halls(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def serve_manifest(request):
-    manifest_path = os.path.join(settings.REACT_APP_DIR, 'public', 'manifest.json')
-    if os.path.exists(manifest_path):
-        with open(manifest_path, 'r') as f:
-            import json
-            manifest_data = json.load(f)
-            return JsonResponse(manifest_data)
-    return JsonResponse({}, status=404)
+    try:
+        manifest_path = os.path.join(settings.REACT_APP_DIR, 'public', 'manifest.json')
+        if os.path.exists(manifest_path):
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = f.read()
+                return HttpResponse(
+                    manifest_data,
+                    content_type='application/json; charset=utf-8'
+                )
+        return HttpResponse(
+            '{"error": "Manifest file not found"}',
+            status=404,
+            content_type='application/json'
+        )
+    except Exception as e:
+        logger.error(f"Error serving manifest.json: {str(e)}")
+        return HttpResponse(
+            '{"error": "Internal server error"}',
+            status=500,
+            content_type='application/json'
+        )

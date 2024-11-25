@@ -71,11 +71,16 @@ const USER_DATA = {
 
 const Main = () => {
   const [selectedLocation, setSelectedLocation] = useState('gorny');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  });
   const [selectedTimes, setSelectedTimes] = useState({});
-  const [bookings, setBookings] = useState(USER_DATA.bookings);
+  const [bookings, setBookings] = useState([]);
   const [notification, setNotification] = useState({ show: false, message: '' });
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(0);
 
   useEffect(() => {
     // Проверяем авторизацию при загрузке
@@ -105,23 +110,68 @@ const Main = () => {
   };
 
   const getDayName = (date) => {
+    if (!(date instanceof Date)) return '';
     return date.toLocaleDateString('ru-RU', { weekday: 'short' });
   };
 
   const getDateString = (date) => {
+    if (!(date instanceof Date)) return '';
     return date.getDate().toString();
   };
 
   const getDays = () => {
     const days = [];
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     for (let i = 0; i < 7; i++) {
-      const date = new Date();
+      const date = new Date(today);
       date.setDate(today.getDate() + i);
       days.push(date);
     }
     return days;
   };
+
+  const handleDayChange = (dayIndex) => {
+    try {
+      setSelectedDay(dayIndex);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const newDate = new Date(today);
+      newDate.setDate(today.getDate() + dayIndex);
+      setSelectedDate(newDate);
+    } catch (error) {
+      console.error('Error in handleDayChange:', error);
+    }
+  };
+
+  const isSlotBooked = (hall, time) => {
+    try {
+      if (!selectedDate || !(selectedDate instanceof Date)) return false;
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      return bookings.some(
+        (b) =>
+          b.hall === hall.name &&
+          b.date === dateStr &&
+          b.time === (time || selectedTimes[hall.id] || '10:00')
+      );
+    } catch (error) {
+      console.error('Error in isSlotBooked:', error);
+      return false;
+    }
+  };
+
+  const days = React.useMemo(() => {
+    try {
+      return getDays().map((date, index) => ({
+        date: getDateString(date),
+        weekday: getDayName(date),
+        isToday: date.toDateString() === new Date().toDateString()
+      }));
+    } catch (error) {
+      console.error('Error in days calculation:', error);
+      return [];
+    }
+  }, []);
 
   const handleTimeChange = (hallId, direction) => {
     const currentTime = selectedTimes[hallId] || '10:00';
@@ -185,19 +235,6 @@ const Main = () => {
 
   const handleLocationChange = (location) => {
     setSelectedLocation(location);
-  };
-
-  const days = getDays().map((date, index) => ({
-    date: getDateString(date),
-    weekday: getDayName(date),
-    isToday: date.toDateString() === new Date().toDateString()
-  }));
-
-  const [selectedDay, setSelectedDay] = useState(0);
-
-  const handleDayChange = (dayIndex) => {
-    setSelectedDay(dayIndex);
-    setSelectedDate(days[dayIndex]);
   };
 
   return (
@@ -319,32 +356,17 @@ const Main = () => {
 
                 <button
                   className={`book-button ${
-                    bookings.some(
-                      (b) =>
-                        b.hall === hall.name &&
-                        b.date === selectedDate.toISOString().split('T')[0] &&
-                        b.time === (selectedTimes[hall.id] || '10:00')
-                    )
+                    isSlotBooked(hall, selectedTimes[hall.id])
                       ? 'booked'
                       : ''
                   }`}
                   onClick={() => handleBooking(hall)}
                   disabled={
                     hall.currentCapacity >= hall.capacity ||
-                    bookings.some(
-                      (b) =>
-                        b.hall === hall.name &&
-                        b.date === selectedDate.toISOString().split('T')[0] &&
-                        b.time === (selectedTimes[hall.id] || '10:00')
-                    )
+                    isSlotBooked(hall, selectedTimes[hall.id])
                   }
                 >
-                  {bookings.some(
-                    (b) =>
-                      b.hall === hall.name &&
-                      b.date === selectedDate.toISOString().split('T')[0] &&
-                      b.time === (selectedTimes[hall.id] || '10:00')
-                  )
+                  {isSlotBooked(hall, selectedTimes[hall.id])
                     ? 'Записано'
                     : 'Записаться'}
                 </button>
