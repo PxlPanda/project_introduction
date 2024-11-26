@@ -2,6 +2,33 @@
 echo MISIS Sport Project Launcher
 echo ========================
 
+:: Проверяем права администратора
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo This script requires administrator privileges.
+    echo Please run this script as administrator.
+    echo Right-click on the script and select "Run as administrator"
+    pause
+    exit
+)
+
+:: Проверяем, установлен ли Chocolatey
+where choco >nul 2>&1
+if errorlevel 1 (
+    echo Installing Chocolatey...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin
+    
+    :: Проверяем успешность установки
+    where choco >nul 2>&1
+    if errorlevel 1 (
+        echo Failed to install Chocolatey. Please install it manually from https://chocolatey.org/install
+        pause
+        exit
+    )
+    echo Chocolatey installed successfully!
+    timeout /t 5 /nobreak
+)
+
 :: Проверяем, установлен ли Python
 python --version > nul 2>&1
 if errorlevel 1 (
@@ -20,6 +47,22 @@ if errorlevel 1 (
     exit
 )
 
+:: Проверяем, установлен ли Make
+make --version > nul 2>&1
+if errorlevel 1 (
+    echo Installing Make using Chocolatey...
+    :: Проверяем, установлен ли Chocolatey
+    where choco > nul 2>&1
+    if errorlevel 1 (
+        echo Installing Chocolatey...
+        @powershell -NoProfile -ExecutionPolicy Bypass -Command "iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"
+        :: Обновляем PATH
+        set "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
+    )
+    :: Устанавливаем Make
+    choco install make -y
+)
+
 :: Проверяем наличие виртуального окружения
 if not exist "venv" (
     echo Creating virtual environment...
@@ -30,10 +73,33 @@ if not exist "venv" (
 echo Activating virtual environment...
 call venv\Scripts\activate
 
-:: Проверяем/устанавливаем зависимости Django
-echo Checking Django dependencies...
+:: Устанавливаем django-cors-headers и другие зависимости
+echo Installing Django dependencies...
 cd django_react
-pip install -r requirements.txt > nul 2>&1
+pip install django-cors-headers
+pip install -r requirements.txt
+
+:: Проверяем настройки CORS в settings.py
+echo Checking CORS settings...
+python -c "from django.conf import settings; print('CORS_ALLOW_ALL_ORIGINS' in dir(settings))" > cors_check.txt
+set /p CORS_CONFIGURED=<cors_check.txt
+del cors_check.txt
+
+if not "%CORS_CONFIGURED%"=="True" (
+    echo Configuring CORS settings...
+    echo. >> django_react/settings.py
+    echo CORS_ALLOW_ALL_ORIGINS = True >> django_react/settings.py
+    echo CORS_ALLOW_CREDENTIALS = True >> django_react/settings.py
+    
+    :: Добавляем corsheaders в INSTALLED_APPS если его там нет
+    python -c "with open('django_react/settings.py', 'r') as f: content = f.read(); print('corsheaders' not in content)" > cors_app_check.txt
+    set /p CORS_APP_NEEDED=<cors_app_check.txt
+    del cors_app_check.txt
+    
+    if "%CORS_APP_NEEDED%"=="True" (
+        python -c "with open('django_react/settings.py', 'r') as f: content = f.readlines(); content.insert([i for i, line in enumerate(content) if 'INSTALLED_APPS' in line][0] + 1, '    \"corsheaders\",\n'); open('django_react/settings.py', 'w').writelines(content)"
+    )
+)
 
 :: Применяем миграции
 echo Applying database migrations...
