@@ -113,6 +113,7 @@ const HALLS = {
 };
 
 const StudentView = () => {
+  console.log('StudentView rendering');  // Добавьте эту строку в начало компонента
   const [selectedLocation, setSelectedLocation] = useState('gorny');
   const [selectedDate, setSelectedDate] = useState(() => {
     const date = new Date();
@@ -160,6 +161,37 @@ const StudentView = () => {
     }
   }, [showHistory]);
 
+  useEffect(() => {
+    // Функция для обновления текущего дня
+    const updateCurrentDay = () => {
+      if (selectedWeek === 0) {
+        const today = new Date();
+        const currentDay = today.getDay() || 7; // воскресенье будет 7
+        const dayIndex = currentDay - 1; // преобразуем в индекс (0-6)
+        
+        // Устанавливаем выбранный день
+        setSelectedDay(dayIndex);
+        
+        // Получаем все дни недели
+        const days = getNextDays();
+        
+        // Находим текущий день в массиве дней
+        const currentDate = days.find(date => 
+          date.getDate() === today.getDate() && 
+          date.getMonth() === today.getMonth()
+        );
+        
+        if (currentDate) {
+          setSelectedDate(currentDate);
+        }
+      }
+    };
+  
+    updateCurrentDay();
+    const interval = setInterval(updateCurrentDay, 60000);
+    return () => clearInterval(interval);
+  }, [selectedWeek]);
+  
   const getDayName = (date) => {
     if (!(date instanceof Date)) return '';
     return date.toLocaleDateString('ru-RU', { weekday: 'short' });
@@ -223,14 +255,15 @@ const StudentView = () => {
     }
     
     // Находим понедельник текущей недели
-    while (today.getDay() !== 1) {
-      today.setDate(today.getDate() - 1);
-    }
+    const currentDay = today.getDay();
+    const diff = currentDay === 0 ? -6 : 1 - currentDay; // Корректировка для воскресенья
+    today.setDate(today.getDate() + diff);
     
+    // Создаем массив дней недели
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      date.setHours(0, 0, 0, 0); // Сбрасываем время
+      date.setHours(0, 0, 0, 0);
       days.push(date);
     }
     return days;
