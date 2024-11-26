@@ -1,4 +1,4 @@
-from tg_bot.code.handlers import router
+from tg_bot.handlers import router
 
 import asyncio
 import logging
@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums.parse_mode import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-import config#type:ignore
+import config#type: ignore
 
 
 load_dotenv()
