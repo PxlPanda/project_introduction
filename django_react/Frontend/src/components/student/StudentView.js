@@ -341,17 +341,24 @@ const StudentView = () => {
     return monday1.toDateString() === monday2.toDateString();
   };
 
-  const hasTimeConflict = (time, date) => {
+  const hasTimeConflict = (time, date, hallName) => {
     const currentWeekDates = getNextDays();
     const isCurrentWeekDate = currentWeekDates.some(d => 
       d.toDateString() === date.toDateString()
     );
-
+  
+    // Проверяем, есть ли уже запись на это время в любой локации
     return bookings.some(booking => 
       booking.time === time && 
       new Date(booking.date).toDateString() === date.toDateString() &&
       isCurrentWeekDate === (selectedWeek === 0)
     );
+  };
+
+  const isPastDate = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(date) < today;
   };
 
   // Временные данные истории (в будущем будут приходить с сервера)
@@ -714,29 +721,40 @@ const StudentView = () => {
                   <h3 className="hall-title">{hall.name}</h3>
                   <div className="time-slots-wrapper">
                     <div className="time-slots">
-                      {Object.entries(hall.timeSlotCapacity).map(([time, timeCapacity]) => {
-                        const isBooked = bookings.some(
-                          booking => 
-                            booking.hall === hall.name && 
-                            booking.time === time && 
-                            new Date(booking.date).getTime() === selectedDate.getTime()
-                        );
-                        const isMyBooking = bookings.some(
-                          booking => 
-                            booking.hall === hall.name &&
-                            booking.time === time && 
-                            new Date(booking.date).getTime() === selectedDate.getTime()
-                        );
-                        const timeConflict = hasTimeConflict(time, selectedDate) && !isMyBooking;
-                        const isFull = timeCapacity.current >= timeCapacity.max;
-                        
-                        return (
-                          <button
-                            key={time}
-                            className={`time-slot ${selectedTimes[hall.id] === time ? 'selected' : ''}`}
-                            onClick={() => handleTimeSelect(hall.id, time)}
-                            disabled={isBooked}
-                            style={timeConflict ? {
+                    {Object.entries(hall.timeSlotCapacity).map(([time, timeCapacity]) => {
+                      const isBooked = bookings.some(
+                        booking => 
+                          booking.hall === hall.name && 
+                          booking.time === time && 
+                          new Date(booking.date).getTime() === selectedDate.getTime()
+                      );
+                      const isMyBooking = bookings.some(
+                        booking => 
+                          booking.hall === hall.name &&
+                          booking.time === time && 
+                          new Date(booking.date).getTime() === selectedDate.getTime() &&
+                          booking.location === (selectedLocation === 'gorny' ? 'Горный' : 'Беляево')
+                      );
+                      const timeConflict = hasTimeConflict(time, selectedDate, hall.name) && !isMyBooking;
+                      const isFull = timeCapacity.current >= timeCapacity.max;
+                      const isPast = isPastDate(selectedDate);
+                      
+                      return (
+                        <button
+                          key={time}
+                          className={`time-slot ${selectedTimes[hall.id] === time ? 'selected' : ''}`}
+                          onClick={() => handleTimeSelect(hall.id, time)}
+                          disabled={isBooked || isPast}
+                          style={
+                            isPast ? {
+                              backgroundColor: '#f5f5f5',
+                              border: '1px solid #e0e0e0',
+                              color: '#bdbdbd',
+                              cursor: 'not-allowed',
+                              minWidth: '90px',
+                              width: '90px',
+                              padding: '8px 4px'
+                            } : timeConflict ? {
                               backgroundColor: '#ffebee',
                               border: '1px solid #ffcdd2',
                               color: '#d32f2f',
@@ -763,15 +781,17 @@ const StudentView = () => {
                               minWidth: '90px',
                               width: '90px',
                               padding: '8px 4px'
-                            }}
-                          >
-                            {time}
-                            {timeConflict && <div style={{ fontSize: '10px' }}>Уже записаны на это время</div>}
-                            {isMyBooking && <div style={{ fontSize: '10px' }}>Записаны</div>}
-                            {isFull && !timeConflict && !isMyBooking && <div style={{ fontSize: '10px' }}>Нет свободных мест</div>}
-                          </button>
-                        );
-                      })}
+                            }
+                          }
+                        >
+                          {time}
+                          {isPast && <div style={{ fontSize: '10px' }}>Прошедший день</div>}
+                          {timeConflict && !isPast && <div style={{ fontSize: '10px' }}>Уже записаны на это время</div>}
+                          {isMyBooking && <div style={{ fontSize: '10px' }}>Записаны</div>}
+                          {isFull && !timeConflict && !isMyBooking && !isPast && <div style={{ fontSize: '10px' }}>Нет свободных мест</div>}
+                        </button>
+                      );
+                    })}
                     </div>
                     <div className="hall-capacity" style={{
                       opacity: selectedTimes[hall.id] ? 1 : 0,
