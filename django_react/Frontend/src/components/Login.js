@@ -9,6 +9,8 @@ function Login({ onLogin }) {
   const [formValue, setFormValue] = useState({
     email: '',
     password: '',
+    passwordConfirm: '',
+    adminPassword: '',
     fullName: '',
     studentNumber: '',
     groupName: ''
@@ -17,6 +19,8 @@ function Login({ onLogin }) {
   const [isValid, setIsValid] = useState({
     email: true,
     password: true,
+    passwordConfirm: true,
+    adminPassword: true,
     fullName: true,
     studentNumber: true,
     groupName: true
@@ -48,6 +52,56 @@ function Login({ onLogin }) {
     }
   }, []);
 
+  const validateField = (name, value) => {
+    let isFieldValid = true;
+    
+    switch (name) {
+      case 'email':
+        if (isStudent) {
+          const emailRegex = /^[^\s@]+@edu\.misis\.ru$/;
+          isFieldValid = emailRegex.test(value);
+        }
+        break;
+      case 'password':
+        isFieldValid = value.length >= 6;
+        // Если пароль изменился, проверяем совпадение с подтверждением
+        if (isRegistration) {
+          setIsValid(prev => ({
+            ...prev,
+            passwordConfirm: value === formValue.passwordConfirm
+          }));
+        }
+        break;
+      case 'passwordConfirm':
+        isFieldValid = value === formValue.password;
+        break;
+      case 'adminPassword':
+        isFieldValid = value.length > 0;
+        break;
+      case 'fullName':
+        const nameRegex = /^[А-ЯЁа-яё]+ [А-ЯЁа-яё]+ [А-ЯЁа-яё]+$/;
+        isFieldValid = nameRegex.test(value);
+        break;
+      case 'studentNumber':
+        const studentNumberRegex = /^\d+$/;  // Любое количество цифр
+        isFieldValid = studentNumberRegex.test(value);
+        break;
+      case 'groupName':
+        const groupRegex = /^[А-ЯЁа-яё]+-\d+-\d+$/;  // Буквы-цифры-цифры
+        isFieldValid = groupRegex.test(value);
+        break;
+      default:
+        break;
+    }
+
+    setIsValid(prevState => ({
+      ...prevState,
+      [name]: isFieldValid
+    }));
+
+    return isFieldValid;
+  }
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     
@@ -76,83 +130,108 @@ function Login({ onLogin }) {
     validateField(name, value);
   }
 
-  const validateField = (name, value) => {
-    let isFieldValid = true;
-    
-    switch (name) {
-      case 'email':
-        if (isStudent) {
-          const emailRegex = /^[^\s@]+@edu\.misis\.ru$/;
-          isFieldValid = emailRegex.test(value);
-        }
-        break;
-      case 'password':
-        isFieldValid = value.length >= 6;
-        break;
-      case 'fullName':
-        // Проверяем только наличие трех слов и отсутствие цифр/спецсимволов
-        const nameRegex = /^[А-ЯЁа-яё]+ [А-ЯЁа-яё]+ [А-ЯЁа-яё]+$/;
-        isFieldValid = nameRegex.test(value);
-        break;
-      case 'studentNumber':
-        const studentNumberRegex = /^[A-ZА-Я]\d{8}$/;
-        isFieldValid = studentNumberRegex.test(value);
-        break;
-      case 'groupName':
-        const groupRegex = /^[А-ЯЁ]{4}-\d{2}-\d{2}$/;
-        isFieldValid = groupRegex.test(value);
-        break;
-      default:
-        break;
-    }
-
-    setIsValid(prevState => ({
-      ...prevState,
-      [name]: isFieldValid
-    }));
-
-    return isFieldValid;
-  }
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
-    const username = isStudent ? formValue.email : formValue.fullName;
-    const password = formValue.password;
-
-    if (!username || !password) {
-      const message = formRef.current.querySelector('.login__message');
-      message.classList.add('visible');
-      setErrorMessage('Пожалуйста, корректно заполните все поля');
+    // Проверяем совпадение паролей при регистрации
+    if (isRegistration && formValue.password !== formValue.passwordConfirm) {
+      setErrorMessage('Пароли не совпадают');
       return;
     }
-
-    // Создаем разные данные для студента и преподавателя
-    const userData = isStudent 
-      ? {
-          type: 'student',
-          name: formValue.fullName || 'Студент Тестовый',
-          group: formValue.groupName || 'БПМ-20-1',
-          studentId: formValue.studentNumber || 'A12345678',
-          points: 75,
-          maxPoints: 100
-        }
-      : {
-          type: 'teacher',
-          name: formValue.fullName || 'Преподаватель Тестовый'
+  
+    try {
+      // Если это регистрация
+      if (isRegistration) {
+        const registrationData = {
+          email: formValue.email,
+          full_name: formValue.fullName,
+          password: formValue.password,
+          student_number: formValue.studentNumber,
+          group_name: formValue.groupName
         };
 
-    // Сохраняем тип пользователя и данные
-    localStorage.setItem('userType', isStudent ? 'student' : 'teacher');
-    localStorage.setItem('userData', JSON.stringify(userData));
-    
-    onLogin();
-    navigate('/main');
-  }
+        console.log('Отправляемые данные:', registrationData);
+
+        const registrationResponse = await fetch(`/api/${isStudent ? 'register-student' : 'register-teacher'}/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(registrationData)
+        });
+  
+        const responseJson = await registrationResponse.json();
+        
+        if (!registrationResponse.ok) {
+          throw new Error(responseJson.error || 'Ошибка регистрации');
+        }
+      }
+      
+      const loginResponse = await fetch('/api/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_type: isStudent ? 'student' : 'teacher',
+          email: isStudent ? formValue.email : undefined,
+          full_name: !isStudent ? formValue.fullName : undefined,  // Отправляем ФИО только для преподавателя
+          password: formValue.password,
+          ...((!isStudent && !isRegistration) && { adminPassword: formValue.adminPassword })
+        })
+      });
+  
+      const loginData = await loginResponse.json();
+  
+      if (!loginResponse.ok) {
+        throw new Error(loginData.error || 'Ошибка авторизации');
+      }
+  
+      // Сохраняем токен и данные пользователя
+      localStorage.setItem('token', loginData.token);
+      localStorage.setItem('userType', loginData.user_type);
+      localStorage.setItem('userData', JSON.stringify({
+        type: loginData.user_type,
+        name: loginData.full_name,
+        ...(loginData.user_type === 'student' && {
+          email: loginData.email,
+          group: formValue.groupName,
+          studentId: formValue.studentNumber
+        })
+      }));
+  
+      onLogin();
+      navigate('/main');
+    } catch (error) {
+      console.error('Error:', error);
+      setErrorMessage(error.message || 'Произошла ошибка');
+    }
+  };
+
+  const resetForm = () => {
+    setFormValue({
+      email: '',
+      password: '',
+      passwordConfirm: '',
+      adminPassword: '',
+      fullName: '',
+      studentNumber: '',
+      groupName: ''
+    });
+    setIsValid({
+      email: true,
+      password: true,
+      passwordConfirm: true,
+      adminPassword: true,
+      fullName: true,
+      studentNumber: true,
+      groupName: true
+    });
+    setErrorMessage('');
+  };
 
   const toggleUserType = () => {
-    // Сначала скрываем все элементы
     const containers = formRef.current.querySelectorAll('.login__input-container');
     const buttons = formRef.current.querySelector('.login__buttons');
     const message = formRef.current.querySelector('.login__message');
@@ -161,29 +240,13 @@ function Login({ onLogin }) {
     buttons.classList.remove('visible');
     if (message) message.classList.remove('visible');
 
-    // После анимации исчезновения меняем состояние
     setTimeout(() => {
       setIsStudent(!isStudent);
-      setErrorMessage('');
-      setFormValue({
-        email: '',
-        password: '',
-        fullName: '',
-        studentNumber: '',
-        groupName: ''
-      });
-      setIsValid({
-        email: true,
-        password: true,
-        fullName: true,
-        studentNumber: true,
-        groupName: true
-      });
+      resetForm();
     }, 300);
   }
 
   const toggleRegistration = () => {
-    // Сначала скрываем все элементы
     const containers = formRef.current.querySelectorAll('.login__input-container');
     const buttons = formRef.current.querySelector('.login__buttons');
     const message = formRef.current.querySelector('.login__message');
@@ -192,24 +255,9 @@ function Login({ onLogin }) {
     buttons.classList.remove('visible');
     if (message) message.classList.remove('visible');
 
-    // После анимации исчезновения меняем состояние
     setTimeout(() => {
       setIsRegistration(!isRegistration);
-      setErrorMessage('');
-      setFormValue({
-        email: '',
-        password: '',
-        fullName: '',
-        studentNumber: '',
-        groupName: ''
-      });
-      setIsValid({
-        email: true,
-        password: true,
-        fullName: true,
-        studentNumber: true,
-        groupName: true
-      });
+      resetForm();
     }, 300);
   }
 
@@ -223,49 +271,26 @@ function Login({ onLogin }) {
           </h2>
           
           {isStudent ? (
-            <div className="login__input-container">
-              <input
-                className={`login__input ${!isValid.email ? 'invalid' : ''}`}
-                type="email"
-                name="email"
-                value={formValue.email}
-                onChange={handleChange}
-                placeholder="Email @edu.misis.ru"
-                required
-              />
-              <span className="login__input-hint">Используйте корпоративную почту @edu.misis.ru</span>
-            </div>
-          ) : (
-            <div className="login__input-container">
-              <input
-                className={`login__input ${!isValid.fullName ? 'invalid' : ''}`}
-                type="text"
-                name="fullName"
-                value={formValue.fullName}
-                onChange={handleChange}
-                placeholder="ФИО"
-                required
-              />
-              <span className="login__input-hint">Введите полное ФИО (Иванов Иван Иванович)</span>
-            </div>
-          )}
-
-          <div className="login__input-container">
-            <input
-              className={`login__input ${!isValid.password ? 'invalid' : ''}`}
-              type="password"
-              name="password"
-              value={formValue.password}
-              onChange={handleChange}
-              placeholder="Пароль"
-              required
-            />
-            <span className="login__input-hint">Минимум 6 символов</span>
-          </div>
-
-          {isRegistration && (
             <>
-              {isStudent && isRegistration && (
+              <div className="login__input-container">
+                <input
+                  className={`login__input ${!isValid.email || (errorMessage && errorMessage.includes('email уже зарегистрирован')) ? 'invalid' : ''}`}
+                  type="email"
+                  name="email"
+                  value={formValue.email}
+                  onChange={handleChange}
+                  placeholder="Email @edu.misis.ru"
+                  required
+                />
+                <span className={`login__input-hint ${errorMessage && errorMessage.includes('email уже зарегистрирован') ? 'error' : ''}`}>
+                  {errorMessage && errorMessage.includes('email уже зарегистрирован')
+                    ? 'Студент с таким email уже зарегистрирован.'
+                    : 'Используйте корпоративную почту @edu.misis.ru'}
+                </span>
+              </div>
+
+              {/* Добавляем поле для ФИО */}
+              {isRegistration && (
                 <div className="login__input-container">
                   <input
                     className={`login__input ${!isValid.fullName ? 'invalid' : ''}`}
@@ -279,12 +304,37 @@ function Login({ onLogin }) {
                   <span className="login__input-hint">Введите полное ФИО (Иванов Иван Иванович)</span>
                 </div>
               )}
+              
+              <div className="login__input-container">
+                <input
+                  className={`login__input ${!isValid.password ? 'invalid' : ''}`}
+                  type="password"
+                  name="password"
+                  value={formValue.password}
+                  onChange={handleChange}
+                  placeholder="Пароль"
+                  required
+                />
+                <span className="login__input-hint">Минимум 6 символов</span>
+              </div>
 
-              {isStudent && (
+              {isRegistration && (
                 <>
                   <div className="login__input-container">
                     <input
-                      className={`login__input ${!isValid.studentNumber ? 'invalid' : ''}`}
+                      className={`login__input ${!isValid.passwordConfirm ? 'invalid' : ''}`}
+                      type="password"
+                      name="passwordConfirm"
+                      value={formValue.passwordConfirm}
+                      onChange={handleChange}
+                      placeholder="Подтвердите пароль"
+                      required
+                    />
+                    <span className="login__input-hint">Пароли должны совпадать</span>
+                  </div>
+                  <div className="login__input-container">
+                    <input
+                      className={`login__input ${!isValid.studentNumber || (errorMessage && errorMessage.includes('номером студенческого уже зарегистрирован')) ? 'invalid' : ''}`}
                       type="text"
                       name="studentNumber"
                       value={formValue.studentNumber}
@@ -292,7 +342,11 @@ function Login({ onLogin }) {
                       placeholder="Номер студенческого"
                       required
                     />
-                    <span className="login__input-hint">Формат: А12345678</span>
+                    <span className={`login__input-hint ${errorMessage && errorMessage.includes('номером студенческого уже зарегистрирован') ? 'error' : ''}`}>
+                      {errorMessage && errorMessage.includes('номером студенческого уже зарегистрирован')
+                        ? 'Студент с таким номером студенческого уже зарегистрирован.'
+                        : 'Введите номер студенческого билета (только цифры)'}
+                    </span>
                   </div>
 
                   <div className="login__input-container">
@@ -305,9 +359,73 @@ function Login({ onLogin }) {
                       placeholder="Группа"
                       required
                     />
-                    <span className="login__input-hint">Формат: АБВГ-00-00</span>
+                    <span className="login__input-hint">Формат: АБВГ-11-22</span>
                   </div>
                 </>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="login__input-container">
+                <input
+                  className={`login__input ${!isValid.fullName || (errorMessage && errorMessage.includes('ФИО уже зарегистрирован')) ? 'invalid' : ''}`}
+                  type="text"
+                  name="fullName"
+                  value={formValue.fullName}
+                  onChange={handleChange}
+                  placeholder="ФИО"
+                  required
+                />
+                <span className={`login__input-hint ${errorMessage && errorMessage.includes('ФИО уже зарегистрирован') ? 'error' : ''}`}>
+                  {errorMessage && errorMessage.includes('ФИО уже зарегистрирован') 
+                    ? 'Преподаватель с таким ФИО уже зарегистрирован. Пожалуйста, войдите в систему или обратитесь к администратору.'
+                    : 'Введите полное ФИО (Иванов Иван Иванович)'}
+                </span>
+              </div>
+
+              {!isRegistration && (
+                <div className="login__input-container">
+                  <input
+                    className={`login__input ${!isValid.adminPassword ? 'invalid' : ''}`}
+                    type="password"
+                    name="adminPassword"
+                    value={formValue.adminPassword}
+                    onChange={handleChange}
+                    placeholder="Административный пароль"
+                    required
+                  />
+                  <span className="login__input-hint">Введите административный пароль для входа</span>
+                </div>
+              )}
+
+              <div className="login__input-container">
+                <input
+                  className={`login__input ${!isValid.password ? 'invalid' : ''}`}
+                  type="password"
+                  name="password"
+                  value={formValue.password}
+                  onChange={handleChange}
+                  placeholder={isRegistration ? "Придумайте пароль" : "Личный пароль"}
+                  required
+                />
+                <span className="login__input-hint">
+                  {isRegistration ? "Минимум 6 символов" : "Введите свой пароль"}
+                </span>
+              </div>
+
+              {isRegistration && (
+                <div className="login__input-container">
+                  <input
+                    className={`login__input ${!isValid.passwordConfirm ? 'invalid' : ''}`}
+                    type="password"
+                    name="passwordConfirm"
+                    value={formValue.passwordConfirm}
+                    onChange={handleChange}
+                    placeholder="Подтвердите пароль"
+                    required
+                  />
+                  <span className="login__input-hint">Пароли должны совпадать</span>
+                </div>
               )}
             </>
           )}
@@ -335,12 +453,6 @@ function Login({ onLogin }) {
               {isRegistration ? 'Уже есть аккаунт? Войти' : 'Создать аккаунт'}
             </button>
           </div>
-
-          {errorMessage && (
-            <div className="login__message login__message_error">
-              {errorMessage}
-            </div>
-          )}
         </form>
       </div>
     </div>

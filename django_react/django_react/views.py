@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth import authenticate, login
-from leads.models import Teacher, Student
+from leads.models import Teacher, Student, PointsHistory
 from leads.serializers import TeacherSerializer, StudentSerializer
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -10,12 +10,181 @@ import os
 from django.conf import settings
 from rest_framework import status
 import logging
+from leads.models import User, Teacher
 from rest_framework.permissions import AllowAny
-from rest_framework.decorators import permission_classes
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-from django.shortcuts import render
+from rest_framework.authtoken.models import Token
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_api(request):
+    """
+    API endpoint для авторизации пользователя
+    """
+    try:
+        print("Данные запроса:", request.data)
+        logger.info(f"Получены данные для входа: {request.data}")
+        
+        user_type = request.data.get('user_type')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        admin_password = request.data.get('adminPassword')
+
+        print(f"user_type: {user_type}")
+        print(f"email: {email}")
+
+        if user_type == 'student':
+            logger.info(f"Попытка входа студента: {email}")
+            
+            if not email:
+                return Response({'error': 'Email обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                # Ищем пользователя по email и is_student
+                user = User.objects.get(email=email, is_student=True)
+                student = Student.objects.get(user=user)
+                
+                auth_user = authenticate(request, email=email, password=password)
+                
+                if auth_user is not None:
+                    token, _ = Token.objects.get_or_create(user=user)
+                    return Response({
+                        'token': token.key,
+                        'user_type': 'student',
+                        'full_name': user.full_name,
+                        'email': user.email
+                    }, status=status.HTTP_200_OK)
+                else:
+                    logger.warning(f"Неверный пароль для студента: {email}")
+                    return Response({'error': 'Неверный пароль'}, status=status.HTTP_401_UNAUTHORIZED)
+                    
+            except (User.DoesNotExist, Student.DoesNotExist):
+                logger.warning(f"Студент не найден: {email}")
+                return Response({'error': 'Студент не найден'}, status=status.HTTP_404_NOT_FOUND)
+
+        elif user_type == 'teacher':
+            full_name = request.data.get('full_name')
+            logger.info(f"Попытка входа преподавателя: {full_name}")
+            
+            if not full_name:
+                return Response({'error': 'ФИО обязательно'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                # Ищем пользователя по ФИО и is_teacher
+                user = User.objects.get(full_name=full_name, is_teacher=True)
+                teacher = Teacher.objects.get(user=user)
+
+                # Если это не регистрация, проверяем административный пароль
+                if admin_password:
+                    if admin_password != settings.TEACHER_ADMIN_PASSWORD:
+                        logger.warning(f"Неверный административный пароль для преподавателя: {full_name}")
+                        return Response({'error': 'Неверный административный пароль'}, status=status.HTTP_401_UNAUTHORIZED)
+                
+                auth_user = authenticate(request, email=user.email, password=password)
+                
+                if auth_user is not None:
+                    token, _ = Token.objects.get_or_create(user=user)
+                    return Response({
+                        'token': token.key,
+                        'user_type': 'teacher',
+                        'full_name': user.full_name,
+                        'email': user.email
+                    }, status=status.HTTP_200_OK)
+                else:
+                    logger.warning(f"Неверный пароль для преподавателя: {full_name}")
+                    return Response({'error': 'Неверный пароль'}, status=status.HTTP_401_UNAUTHORIZED)
+                    
+            except (User.DoesNotExist, Teacher.DoesNotExist):
+                logger.warning(f"Преподаватель не найден: {full_name}")
+                return Response({'error': 'Преподаватель не найден'}, status=status.HTTP_404_NOT_FOUND)
+        
+        else:
+            logger.warning(f"Неверный тип пользователя: {user_type}")
+            return Response({'error': 'Неверный тип пользователя'}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f"Ошибка при входе: {str(e)}")
+        return Response(
+            {'error': f'Ошибка сервера при входе: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_students(request):
+    """
+    Получение списка всех студентов для преподавателя
+    """
+    if not hasattr(request.user, 'teacher_profile'):
+        return Response(
+            {'error': 'Доступ запрещен'}, 
+            status=status.HTTP_403_FORBIDDEN
+        )
+        
+    students = Student.objects.all()
+    data = []
+    for student in students:
+        student_data = {
+            'id': student.id,
+            'name': student.user.full_name,
+            'group': student.group_name,
+            'points': student.points
+        }
+        data.append(student_data)
+    return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_points(request):
+    """
+    Сохранение баллов для списка студентов
+    """
+    if not hasattr(request.user, 'teacher_profile'):
+        return Response(
+            {'error': 'Доступ запрещен'}, 
+            status=status.HTTP_403_FORBIDDEN
+        )
+        
+    try:
+        students_points = request.data.get('students_points', [])
+        for student_point in students_points:
+            student_id = student_point.get('student_id')
+            points = student_point.get('points')
+            reason = student_point.get('reason')
+            
+            if not all([student_id, points is not None, reason]):
+                continue
+                
+            student = Student.objects.get(id=student_id)
+            PointsHistory.objects.create(
+                student=student,
+                points=points,
+                reason=reason,
+                awarded_by=request.user.teacher_profile
+            )
+            
+        return Response({'message': 'Баллы успешно сохранены'})
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_server_time(request):
+    """
+    Получение текущего серверного времени
+    """
+    current_time = timezone.now()
+    return Response({
+        'timestamp': current_time.timestamp(),
+        'datetime': current_time.isoformat()
+    })
 
 def index(request):
     try:
@@ -32,31 +201,174 @@ def index(request):
             content_type='text/html; charset=utf-8'
         )
 
-# Регистрация преподавателя
 @api_view(['POST'])
-def register_teacher(request):
-    """
-    Регистрация нового преподавателя.
-    """
-    serializer = TeacherSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({'message': 'Преподаватель успешно зарегистрирован'}, status=status.HTTP_201_CREATED)
-    logger.error(f"Ошибка регистрации преподавателя: {serializer.errors}")
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# Регистрация студента
-@api_view(['POST'])
+@permission_classes([AllowAny])
 def register_student(request):
     """
     Регистрация нового студента.
     """
-    serializer = StudentSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({'message': 'Студент успешно зарегистрирован'}, status=status.HTTP_201_CREATED)
-    logger.error(f"Ошибка регистрации студента: {serializer.errors}")
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        logger.info(f"Получены данные для регистрации студента: {request.data}")
+        
+        email = request.data.get('email')
+        password = request.data.get('password')
+        full_name = request.data.get('full_name')
+        student_number = request.data.get('student_number')
+        group_name = request.data.get('group_name')
+
+        # Добавляем отладочный вывод
+        print("Полученные данные:")
+        print(f"email: {email}")
+        print(f"full_name: {full_name}")
+        print(f"student_number: {student_number}")
+        print(f"group_name: {group_name}")
+        print(f"password length: {len(password) if password else 0}")
+
+        # Проверяем обязательные поля по одному
+        if not email:
+            return Response({'error': 'Email обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+        if not password:
+            return Response({'error': 'Пароль обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+        if not full_name:
+            return Response({'error': 'ФИО обязательно'}, status=status.HTTP_400_BAD_REQUEST)
+        if not student_number:
+            return Response({'error': 'Номер студенческого обязателен'}, status=status.HTTP_400_BAD_REQUEST)
+        if not group_name:
+            return Response({'error': 'Группа обязательна'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Проверяем обязательные поля
+        if not all([email, password, full_name, student_number, group_name]):
+            return Response(
+                {'error': 'Все поля обязательны для заполнения'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not password or len(password) < 6:
+            return Response(
+                {'error': 'Пароль должен содержать минимум 6 символов'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверяем, не существует ли уже студент с таким email или номером
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {'error': 'Студент с таким email уже зарегистрирован'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if Student.objects.filter(student_number=student_number).exists():
+            return Response(
+                {'error': 'Студент с таким номером студенческого уже зарегистрирован'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Создаем пользователя
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            full_name=full_name,
+            is_student=True,
+            is_teacher=False
+        )
+        
+        # Создаем профиль студента
+        student = Student.objects.create(
+            user=user,
+            student_number=student_number,
+            group_name=group_name
+        )
+
+        # Создаем токен для автоматического входа
+        token, _ = Token.objects.get_or_create(user=user)
+
+        logger.info(f"Студент успешно создан: {user.id}")
+        
+        return Response({
+            'message': 'Студент успешно зарегистрирован',
+            'token': token.key,
+            'user_type': 'student',
+            'full_name': user.full_name,
+            'email': user.email
+        }, status=status.HTTP_201_CREATED)
+            
+    except Exception as e:
+        logger.error(f"Ошибка регистрации студента: {str(e)}")
+        return Response(
+            {'error': f'Ошибка сервера при регистрации: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+# Регистрация преподавателя
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_teacher(request):
+    """
+    Регистрация нового преподавателя.
+    """
+    try:
+        logger.info(f"Получены данные для регистрации преподавателя: {request.data}")
+        
+        full_name = request.data.get('full_name')
+        password = request.data.get('password')
+
+        if not full_name:
+            return Response(
+                {'error': 'ФИО обязательно для заполнения'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not password or len(password) < 6:
+            return Response(
+                {'error': 'Пароль должен содержать минимум 6 символов'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверяем, не существует ли уже преподаватель с таким ФИО
+        if User.objects.filter(full_name=full_name, is_teacher=True).exists():
+            return Response(
+                {'error': 'Преподаватель с таким ФИО уже зарегистрирован'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Создаем уникальный email, добавляя числовой суффикс если нужно
+        base_email = f"{full_name.replace(' ', '_').lower()}"
+        email = f"{base_email}@edu.misis.ru"
+        counter = 1
+        while User.objects.filter(email=email).exists():
+            email = f"{base_email}_{counter}@edu.misis.ru"
+            counter += 1
+
+        # Создаем пользователя
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            full_name=full_name,
+            is_teacher=True,
+            is_student=False
+        )
+        
+        # Создаем профиль преподавателя
+        teacher = Teacher.objects.create(user=user)
+
+        # Создаем токен для автоматического входа
+        token, _ = Token.objects.get_or_create(user=user)
+
+        logger.info(f"Преподаватель успешно создан: {user.id}")
+        
+        return Response({
+            'message': 'Преподаватель успешно зарегистрирован',
+            'token': token.key,
+            'user_type': 'teacher',
+            'full_name': user.full_name,
+            'email': user.email  # Возвращаем email, чтобы преподаватель знал свой логин
+        }, status=status.HTTP_201_CREATED)
+            
+    except Exception as e:
+        logger.error(f"Ошибка регистрации преподавателя: {str(e)}")
+        return Response(
+            {'error': f'Ошибка сервера при регистрации: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 # Авторизация пользователя
 @api_view(['POST'])
@@ -199,4 +511,66 @@ def serve_manifest(request):
             '{"error": "Internal server error"}',
             status=500,
             content_type='application/json'
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def award_points_manually(request):
+    """
+    Ручное начисление баллов студенту преподавателем
+    """
+    try:
+        # Проверяем, что пользователь является преподавателем
+        if not hasattr(request.user, 'teacher_profile'):
+            return Response(
+                {'error': 'Только преподаватели могут начислять баллы'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Получаем данные из запроса
+        student_id = request.data.get('student_id')
+        points = request.data.get('points')
+        reason = request.data.get('reason')
+
+        # Проверяем обязательные поля
+        if not all([student_id, points, reason]):
+            return Response(
+                {'error': 'Необходимо указать student_id, points и reason'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Находим студента
+        try:
+            student = Student.objects.get(id=student_id)
+        except Student.DoesNotExist:
+            return Response(
+                {'error': 'Студент не найден'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Создаем запись о начислении баллов
+        points_history = PointsHistory.objects.create(
+            student=student,
+            points=points,
+            reason=reason,
+            awarded_by=request.user.teacher_profile,
+            points_type='MANUAL'
+        )
+
+        return Response({
+            'message': 'Баллы успешно начислены',
+            'points_history': {
+                'id': points_history.id,
+                'student': student.user.full_name,
+                'points': points,
+                'reason': reason,
+                'date': points_history.date,
+                'type': 'Ручное начисление'
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

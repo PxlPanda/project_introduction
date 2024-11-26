@@ -330,3 +330,17 @@ body {
   transform: translateY(-20px);
   transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
 }
+
+.login__input-hint.error {
+  color: #c62828;
+  font-weight: 500;
+}
+
+.login__input-hint.error {
+  color: #c62828;
+  font-weight: 500;
+}
+
+.login__input.invalid {
+  border-color: #c62828;
+}

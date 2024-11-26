@@ -7,10 +7,12 @@ import os
 
 urlpatterns = [
     # API endpoints
-    path('api/', include('leads.urls')),  # Включаем все URL из leads.urls
-    
-    # JWT refresh token endpoint
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/server-time/', views.get_server_time, name='server_time'),
+    path('api/students/', views.get_students, name='get_students'),
+    path('api/save-points/', views.save_points, name='save_points'),
+    path('api/login/', views.login_api, name='login'),  # Убедимся, что этот URL здесь
+    path('api/register-teacher/', views.register_teacher, name='register_teacher'),
+    path('api/register-student/', views.register_student, name='register-student'),
     
     # Static files
     path('manifest.json', views.serve_manifest, name='serve_manifest'),
@@ -18,8 +20,8 @@ urlpatterns = [
     path('logo512.png', lambda request: serve(request, os.path.join('public', 'logo512.png'), document_root=settings.REACT_APP_DIR)),
     path('favicon.ico', lambda request: serve(request, os.path.join('public', 'favicon.ico'), document_root=settings.REACT_APP_DIR)),
     
-    # React app catch-all
-    re_path(r'^.*$', views.index, name='index'),
+    # React app catch-all - должен быть последним
+    re_path(r'^(?!api/).*$', views.index, name='index'),
 ]
 
 if settings.DEBUG:

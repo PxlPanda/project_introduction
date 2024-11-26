@@ -47,9 +47,22 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
-    group_name = models.CharField(max_length=50)
+    group_name = models.CharField(max_length=50)  # Оставляем просто CharField без дополнительных валидаторов
     student_number = models.CharField(max_length=50, unique=True)
     points = models.IntegerField(default=0)
+
+    def clean(self):
+        # Проверяем, что номер студенческого состоит только из цифр
+        if not self.student_number.isdigit():
+            raise ValidationError({'student_number': 'Номер студенческого должен состоять только из цифр'})
+        
+        # Проверяем формат группы
+        if not re.match(r'^[А-ЯЁа-яё]+-\d+-\d+$', self.group_name):
+            raise ValidationError({'group_name': 'Группа должна быть в формате Буквы-цифры-цифры'})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.full_name} - {self.group_name}"
@@ -110,20 +123,23 @@ class Booking(models.Model):
         return f"{self.student.user.full_name} - {self.hall.name} - {self.date} {self.time_slot}"
 
 class PointsHistory(models.Model):
+    POINTS_TYPE_CHOICES = [
+        ('AUTO', 'Автоматическое'),
+        ('MANUAL', 'Ручное'),
+    ]
+    
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='points_history')
     points = models.IntegerField()
     reason = models.CharField(max_length=255)
     date = models.DateTimeField(auto_now_add=True)
     booking = models.ForeignKey(Booking, null=True, blank=True, on_delete=models.SET_NULL, related_name='points')
     awarded_by = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='awarded_points')
+    points_type = models.CharField(max_length=10, choices=POINTS_TYPE_CHOICES, default='AUTO')
 
     def __str__(self):
-        return f"{self.student.user.full_name} - {self.points} points - {self.date}"
+        return f"{self.student} - {self.points} баллов ({self.get_points_type_display()})"
 
     def save(self, *args, **kwargs):
+        if not self.booking:
+            self.points_type = 'MANUAL'
         super().save(*args, **kwargs)
-        # Обновляем общее количество баллов студента
-        total_points = PointsHistory.objects.filter(student=self.student).aggregate(
-            total=models.Sum('points'))['total'] or 0
-        self.student.points = total_points
-        self.student.save()

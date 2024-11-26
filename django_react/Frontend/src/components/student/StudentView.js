@@ -114,6 +114,8 @@ const HALLS = {
 
 const StudentView = () => {
   console.log('StudentView rendering');  // Добавьте эту строку в начало компонента
+
+  const [serverTime, setServerTime] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState('gorny');
   const [selectedDate, setSelectedDate] = useState(() => {
     const date = new Date();
@@ -129,6 +131,26 @@ const StudentView = () => {
   const [userData, setUserData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
+
+  const fetchServerTime = async () => {
+    try {
+      console.log('Fetching server time...');
+      const response = await fetch('http://127.0.0.1:8000/api/server-time/');  // Изменили URL
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      console.log('Server response:', data);
+      return new Date(data.datetime);
+    } catch (error) {
+      console.error('Error fetching server time:', error);
+      return new Date(); // Fallback to local time if server request fails
+    }
+  };
+
+  useEffect(() => {
+    console.log('Server Time:', serverTime);
+  }, [serverTime]);
 
   useEffect(() => {
     const savedUserData = localStorage.getItem('userData');
@@ -164,33 +186,64 @@ const StudentView = () => {
   useEffect(() => {
     // Функция для обновления текущего дня
     const updateCurrentDay = () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Получаем текущий день недели (0 - воскресенье, 1 - понедельник, ..., 6 - суббота)
+      const currentDay = today.getDay();
+      // Преобразуем в индекс (0 - понедельник, ..., 6 - воскресенье)
+      const dayIndex = currentDay === 0 ? 6 : currentDay - 1;
+      
       if (selectedWeek === 0) {
-        const today = new Date();
-        const currentDay = today.getDay() || 7; // воскресенье будет 7
-        const dayIndex = currentDay - 1; // преобразуем в индекс (0-6)
-        
-        // Устанавливаем выбранный день
         setSelectedDay(dayIndex);
         
-        // Получаем все дни недели
+        // Получаем все дни текущей недели
         const days = getNextDays();
         
-        // Находим текущий день в массиве дней
-        const currentDate = days.find(date => 
+        // Находим сегодняшний день среди дней недели
+        const todayInWeek = days.find(date => 
           date.getDate() === today.getDate() && 
-          date.getMonth() === today.getMonth()
+          date.getMonth() === today.getMonth() &&
+          date.getFullYear() === today.getFullYear()
         );
         
-        if (currentDate) {
-          setSelectedDate(currentDate);
+        // Если нашли сегодняшний день, устанавливаем его как выбранный
+        if (todayInWeek) {
+          setSelectedDate(todayInWeek);
+          // Сбрасываем выбранное время при смене дня
+          setSelectedTimes({});
         }
       }
     };
   
+    // Обновляем день при монтировании компонента
     updateCurrentDay();
-    const interval = setInterval(updateCurrentDay, 60000);
+  
+    // Проверяем каждую минуту, не начался ли новый день
+    const interval = setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === 0 && now.getMinutes() === 0) {
+        updateCurrentDay();
+      }
+    }, 60000);
+  
     return () => clearInterval(interval);
-  }, [selectedWeek]);
+  }, [selectedWeek]); // Добавляем selectedWeek в зависимости
+
+  useEffect(() => {
+    console.log('Time sync effect running');
+    const syncTime = async () => {
+      console.log('Syncing time...');
+      const time = await fetchServerTime();
+      console.log('Got time:', time);
+      setServerTime(time);
+    };
+  
+    syncTime();
+    const interval = setInterval(syncTime, 60000);
+  
+    return () => clearInterval(interval);
+  }, []);
   
   const getDayName = (date) => {
     if (!(date instanceof Date)) return '';
@@ -247,23 +300,25 @@ const StudentView = () => {
 
   const getNextDays = () => {
     const days = [];
-    const today = new Date();
+    const today = serverTime || new Date();
+    today.setHours(0, 0, 0, 0);
     
-    // Если выбрана следующая неделя, добавляем 7 дней
+    // Получаем текущий день недели (0 - воскресенье, 1 - понедельник, ..., 6 - суббота)
+    const currentDay = today.getDay();
+    
+    // Вычисляем начало текущей недели (понедельник)
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+    
+    // Если выбрана следующая неделя, добавляем 7 дней к понедельнику
     if (selectedWeek === 1) {
-      today.setDate(today.getDate() + 7);
+      monday.setDate(monday.getDate() + 7);
     }
     
-    // Находим понедельник текущей недели
-    const currentDay = today.getDay();
-    const diff = currentDay === 0 ? -6 : 1 - currentDay; // Корректировка для воскресенья
-    today.setDate(today.getDate() + diff);
-    
-    // Создаем массив дней недели
+    // Добавляем 7 дней, начиная с понедельника
     for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      date.setHours(0, 0, 0, 0);
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
       days.push(date);
     }
     return days;
@@ -613,18 +668,26 @@ const StudentView = () => {
             ←
           </button>
           <div style={{ display: 'flex', gap: '10px' }}>
-            {getNextDays().map((date, index) => (
+          {getNextDays().map((date, index) => {
+            const currentTime = serverTime || new Date();
+            currentTime.setHours(0, 0, 0, 0);
+            const isToday = date.getTime() === currentTime.getTime();
+            
+            console.log('Date:', date.toISOString(), 'Current:', currentTime.toISOString(), 'IsToday:', isToday);
+            
+            return (
               <button
                 key={date.toISOString()}
                 className={`day-button ${
                   selectedDate && date.getTime() === selectedDate.getTime() ? 'selected' : ''
-                } ${index === 0 && selectedWeek === 0 ? 'today' : ''}`}
+                } ${isToday ? 'today' : ''}`}
                 onClick={() => handleDateSelect(date)}
               >
                 <span className="date">{getDateString(date)}</span>
                 <span className="weekday">{getDayName(date)}</span>
               </button>
-            ))}
+            );
+          })}
           </div>
           <button 
             onClick={() => setSelectedWeek(1)}

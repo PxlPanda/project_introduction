@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HALLS } from '../constants/halls';
 import { timeSlots } from '../constants/timeSlots';
 import '../styles/base.css';
@@ -7,6 +7,24 @@ import '../styles/hall-card.css';
 import '../styles/buttons.css';
 import '../styles/header.css';
 import '../styles/calendar.css';
+
+const SearchInput = React.memo(({ value, onChange }) => {
+  return (
+    <input
+      type="text"
+      placeholder="Поиск по ФИО"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: '100%',
+        padding: '8px',
+        border: '1px solid #ddd',
+        borderRadius: '4px',
+        fontSize: '14px'
+      }}
+    />
+  );
+});
 
 const TeacherView = () => {
   const [selectedLocation, setSelectedLocation] = useState('gorny');
@@ -26,19 +44,96 @@ const TeacherView = () => {
   const [selectedPoints, setSelectedPoints] = useState({});
   const [pointsReasons, setPointsReasons] = useState({});
   const [hallCapacities, setHallCapacities] = useState({});
+  const [maxPoints, setMaxPoints] = useState(10);
+  const [selectedStudents, setSelectedStudents] = useState(new Set());
+  const [isLoading, setIsLoading] = useState(false);
 
-  const mockStudents = [
-    { id: 1, name: 'Иванов Иван', group: 'БПМ-20-1', attendance: [], currentPoints: 65 },
-    { id: 2, name: 'Петров Петр', group: 'БПМ-20-2', attendance: [], currentPoints: 45 },
-    { id: 3, name: 'Сидоров Сидор', group: 'БПМ-20-1', attendance: [], currentPoints: 80 },
-    { id: 4, name: 'Смирнова Анна', group: 'БПМ-20-2', attendance: [], currentPoints: 72 },
-    { id: 5, name: 'Козлов Дмитрий', group: 'БПМ-20-3', attendance: [], currentPoints: 58 },
-    { id: 6, name: 'Морозова Елена', group: 'БПМ-20-1', attendance: [], currentPoints: 90 },
-    { id: 7, name: 'Волков Артем', group: 'БПМ-20-3', attendance: [], currentPoints: 63 },
-    { id: 8, name: 'Соколова Мария', group: 'БПМ-20-2', attendance: [], currentPoints: 77 },
-    { id: 9, name: 'Попов Александр', group: 'БПМ-20-1', attendance: [], currentPoints: 85 },
-    { id: 10, name: 'Лебедева Ольга', group: 'БПМ-20-3', attendance: [], currentPoints: 69 }
-  ];
+  // Состояния для модального окна начисления баллов
+  const [showAwardPointsModal, setShowAwardPointsModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [pointsToAward, setPointsToAward] = useState('');
+  const [pointsReason, setPointsReason] = useState('');
+  const [awardingPoints, setAwardingPoints] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef(null);
+
+  const fetchStudents = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/students/', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Ошибка загрузки списка студентов');
+      }
+      const data = await response.json();
+      setStudentsForTimeSlot(data);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      alert('Не удалось загрузить список студентов');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showStudentsList) {
+      fetchStudents();
+    }
+  }, [showStudentsList]);
+
+  const getSortedStudents = () => {
+    return [...studentsForTimeSlot].sort((a, b) => {
+      if (selectedStudents.has(a.id) && !selectedStudents.has(b.id)) return -1;
+      if (!selectedStudents.has(a.id) && selectedStudents.has(b.id)) return 1;
+      return 0;
+    });
+  };
+
+    // Функция для начисления баллов
+    const handleAwardPoints = async () => {
+      if (!selectedStudent || !pointsToAward || !pointsReason) {
+        alert('Пожалуйста, заполните все поля');
+        return;
+      }
+  
+      try {
+        setAwardingPoints(true);
+        const response = await fetch('/api/award-points/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            student_id: selectedStudent.id,
+            points: parseInt(pointsToAward),
+            reason: pointsReason
+          })
+        });
+  
+        if (!response.ok) {
+          throw new Error('Ошибка при начислении баллов');
+        }
+  
+        const data = await response.json();
+        alert('Баллы успешно начислены');
+        
+        // Очищаем форму
+        setPointsToAward('');
+        setPointsReason('');
+        setShowAwardPointsModal(false);
+        
+      } catch (error) {
+        console.error('Error awarding points:', error);
+        alert('Произошла ошибка при начислении баллов');
+      } finally {
+        setAwardingPoints(false);
+      }
+    };
+
 
   useEffect(() => {
     const savedUserData = localStorage.getItem('userData');
@@ -49,6 +144,12 @@ const TeacherView = () => {
     setUserData(JSON.parse(savedUserData));
   }, []);
 
+  useEffect(() => {
+    if (isSearchFocused && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchName, isSearchFocused]);
+
   const handleMarkAttendance = (hall) => {
     const selectedTime = selectedTimeSlots[hall.id];
     if (!selectedTime) {
@@ -57,22 +158,22 @@ const TeacherView = () => {
     }
     setShowStudentsList(true);
     // В реальном приложении здесь будет запрос к API для получения студентов на конкретное время
-    setStudentsForTimeSlot(mockStudents);
+    const uniqueGroups = [...new Set(studentsForTimeSlot.map(student => student.group))];
     // Устанавливаем значение по умолчанию 10 баллов для всех студентов
     const defaultPoints = {};
-    mockStudents.forEach(student => {
+    const filteredStudents = studentsForTimeSlot.filter(student => {
       defaultPoints[student.id] = 10;
     });
     setSelectedPoints(defaultPoints);
   };
 
   const handleSearch = () => {
-    const filteredStudents = mockStudents.filter(student => {
+    const filtered = studentsForTimeSlot.filter(student => {
       const nameMatch = student.name.toLowerCase().includes(searchName.toLowerCase());
       const groupMatch = !searchGroup || student.group === searchGroup;
       return nameMatch && groupMatch;
     });
-    setStudentsForTimeSlot(filteredStudents);
+    setStudentsForTimeSlot(filtered);
   };
 
   useEffect(() => {
@@ -80,9 +181,10 @@ const TeacherView = () => {
   }, [searchName, searchGroup]);
 
   const handlePointsChange = (studentId, points) => {
+    const limitedPoints = Math.min(points, maxPoints);
     setSelectedPoints(prev => ({
       ...prev,
-      [studentId]: Math.min(Math.max(0, points), 10)
+      [studentId]: limitedPoints
     }));
   };
 
@@ -93,12 +195,46 @@ const TeacherView = () => {
     }));
   };
 
-  const handleSavePoints = () => {
-    // TODO: Здесь будет отправка данных на сервер
-    console.log('Сохраняем баллы:', selectedPoints);
-    console.log('Причины:', pointsReasons);
-    showNotification('Баллы успешно сохранены');
-    setShowStudentsList(false);
+  const handleSavePoints = async () => {
+    try {
+      setIsLoading(true);
+      const studentsToUpdate = Object.entries(selectedPoints).map(([studentId, points]) => ({
+        student_id: parseInt(studentId),
+        points: points,
+        reason: pointsReasons[studentId] || ''
+      })).filter(item => item.points > 0 && item.reason);
+  
+      if (studentsToUpdate.length === 0) {
+        alert('Нет баллов для сохранения');
+        return;
+      }
+  
+      const response = await fetch('/api/save-points/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          students_points: studentsToUpdate
+        })
+      });
+  
+      if (!response.ok) {
+        throw new Error('Ошибка сохранения баллов');
+      }
+  
+      alert('Баллы успешно сохранены');
+      setSelectedPoints({});
+      setPointsReasons({});
+      setShowStudentsList(false);
+      
+    } catch (error) {
+      console.error('Error saving points:', error);
+      alert('Не удалось сохранить баллы');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fetchHallCapacity = async (hallId, time) => {
@@ -135,7 +271,13 @@ const TeacherView = () => {
   };
 
   const StudentsList = () => {
-    const uniqueGroups = [...new Set(mockStudents.map(student => student.group))];
+    const uniqueGroups = [...new Set(studentsForTimeSlot.map(student => student.group))];
+    
+    const filteredStudents = studentsForTimeSlot.filter(student => {
+      const nameMatch = student.name.toLowerCase().includes(searchName.toLowerCase());
+      const groupMatch = !searchGroup || student.group === searchGroup;
+      return nameMatch && groupMatch;
+    });
     
     return (
       <div className="modal-overlay" style={{
@@ -179,19 +321,10 @@ const TeacherView = () => {
           </div>
           
           <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Поиск по ФИО"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              style={{
-                flex: 2,
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-            />
+          <SearchInput 
+            value={searchName}
+            onChange={setSearchName}
+          />
             <select
               value={searchGroup}
               onChange={(e) => setSearchGroup(e.target.value)}
@@ -218,14 +351,35 @@ const TeacherView = () => {
             borderRadius: '4px',
             boxShadow: 'inset 0 0 5px rgba(0,0,0,0.1)'
           }}>
-            {studentsForTimeSlot.map(student => (
+            {getSortedStudents().map((student, index) => (
               <div key={student.id} style={{
                 padding: '15px',
                 borderBottom: '1px solid #eee',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '15px'
+                gap: '15px',
+                backgroundColor: selectedStudents.has(student.id) ? '#f5f5f5' : 'white'
               }}>
+                <div style={{ flex: 0.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.has(student.id)}
+                    onChange={(e) => {
+                      const newSelected = new Set(selectedStudents);
+                      if (e.target.checked) {
+                        newSelected.add(student.id);
+                      } else {
+                        newSelected.delete(student.id);
+                      }
+                      setSelectedStudents(newSelected);
+                    }}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
                 <div style={{ flex: 2 }}>
                   <div style={{ fontWeight: 'bold' }}>{student.name}</div>
                   <div style={{ fontSize: '14px', color: '#666' }}>{student.group}</div>
@@ -235,7 +389,24 @@ const TeacherView = () => {
                     type="text"
                     placeholder="Причина начисления баллов"
                     value={pointsReasons[student.id] || ''}
-                    onChange={(e) => handleReasonChange(student.id, e.target.value)}
+                    onChange={(e) => {
+                      handleReasonChange(student.id, e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const pointsInput = document.querySelector(`#points-${student.id}`);
+                        if (pointsInput) pointsInput.focus();
+                      }
+                      if (e.key === 'ArrowDown' && index < studentsForTimeSlot.length - 1) {
+                        const nextInput = document.querySelector(`#reason-${studentsForTimeSlot[index + 1].id}`);
+                        if (nextInput) nextInput.focus();
+                      }
+                      if (e.key === 'ArrowUp' && index > 0) {
+                        const prevInput = document.querySelector(`#reason-${studentsForTimeSlot[index - 1].id}`);
+                        if (prevInput) prevInput.focus();
+                      }
+                    }}
+                    id={`reason-${student.id}`}
                     style={{
                       width: '100%',
                       padding: '8px',
@@ -249,18 +420,49 @@ const TeacherView = () => {
                   <input
                     type="number"
                     min="0"
-                    max="10"
+                    max={maxPoints}
                     value={selectedPoints[student.id] || 0}
                     onChange={(e) => handlePointsChange(student.id, parseInt(e.target.value) || 0)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                        if (index < studentsForTimeSlot.length - 1) {
+                          const nextReasonInput = document.querySelector(`#reason-${studentsForTimeSlot[index + 1].id}`);
+                          if (nextReasonInput) nextReasonInput.focus();
+                        }
+                      }
+                      if (e.key === 'ArrowUp' && index > 0) {
+                        const prevReasonInput = document.querySelector(`#reason-${studentsForTimeSlot[index - 1].id}`);
+                        if (prevReasonInput) prevReasonInput.focus();
+                      }
+                    }}
+                    id={`points-${student.id}`}
                     style={{
                       width: '60px',
                       padding: '8px',
-                      border: '1px solid #ddd',
+                      border: selectedPoints[student.id] ? '2px solid #1976d2' : '1px solid #ddd',
                       borderRadius: '4px',
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      backgroundColor: selectedPoints[student.id] ? '#e3f2fd' : 'white'
                     }}
                   />
-                  <span style={{ color: '#666' }}>/ 10</span>
+                  <span style={{ color: '#666' }}>/ </span>
+                  {student.id === studentsForTimeSlot[0]?.id ? (
+                    <input
+                      type="number"
+                      min="1"
+                      value={maxPoints}
+                      onChange={(e) => setMaxPoints(parseInt(e.target.value) || 1)}
+                      style={{
+                        width: '60px',
+                        padding: '8px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        textAlign: 'center'
+                      }}
+                    />
+                  ) : (
+                    <span style={{ color: '#666' }}>{maxPoints}</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -507,6 +709,60 @@ const TeacherView = () => {
       {notification.show && (
         <div className="notification">
           {notification.message}
+        </div>
+      )}
+      
+      {notification.show && (
+        <div className="notification">
+          {notification.message}
+        </div>
+      )}
+
+      {/* Модальное окно для начисления баллов */}
+      {showAwardPointsModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Начисление баллов</h2>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Студент:</label>
+                <div>{selectedStudent?.user?.full_name}</div>
+              </div>
+              <div className="form-group">
+                <label>Количество баллов:</label>
+                <input
+                  type="number"
+                  value={pointsToAward}
+                  onChange={(e) => setPointsToAward(e.target.value)}
+                  min="1"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Причина начисления:</label>
+                <textarea
+                  value={pointsReason}
+                  onChange={(e) => setPointsReason(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                onClick={() => setShowAwardPointsModal(false)}
+                disabled={awardingPoints}
+              >
+                Отмена
+              </button>
+              <button 
+                onClick={handleAwardPoints}
+                disabled={awardingPoints || !pointsToAward || !pointsReason}
+                className="primary"
+              >
+                {awardingPoints ? 'Начисление...' : 'Начислить баллы'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
