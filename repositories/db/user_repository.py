@@ -6,6 +6,8 @@ from persistent.db.base import uuid4_as_str
 import os
 from hashlib import sha256
 from dotenv import load_dotenv#type: ignore
+from User_aut.mail_validation import send_email
+
 
 load_dotenv()
 
@@ -26,7 +28,8 @@ class UserRepository:
         hashed_password = sha256()
         hashed_password.update(password.encode())
         hashed_password.update(os.getenv("SALT").encode())
-        stmp = insert(User).values({"id":uuid, "email":email, "name":name, "password":hashed_password.hexdigest(), "token":token, "is_admin" : is_admin}) 
+        email_num = await send_email()
+        stmp = insert(User).values({"id":uuid, "email":email, "name":name, "password":hashed_password.hexdigest(), "token":token, "is_admin" : is_admin, "email_num": email_num}) 
         
         async with self._sessionmaker() as session:
             await session.execute(stmp)
@@ -59,3 +62,6 @@ class UserRepository:
             return None
         else:
             return row[0]
+
+    async def check_email_code(self, uuid):
+        ...

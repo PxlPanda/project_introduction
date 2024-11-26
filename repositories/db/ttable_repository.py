@@ -1,5 +1,5 @@
 from persistent.db.TimeTable import TTable
-from infrastructure.sql.connect import sqlite_connection
+from infrastructure.sql.connect import sqlite_connection, create_all_tables
 from sqlalchemy import insert, select, update
 import asyncio
 from repositories.db.user_repository import UserRepository#type: ignore
@@ -13,6 +13,7 @@ class TtableRepository:
     def __init__(self):
         self.sessionmaker = sqlite_connection()
         self.userrepository = UserRepository()
+        create_all_tables()
     
     
     async def put_time(self, time:str, uuid:str):
