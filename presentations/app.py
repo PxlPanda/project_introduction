@@ -23,10 +23,10 @@ async def auth(email:str, password:str) -> str:
         return "fuck up"
     
 @app.post("/signin")
-async def register(email:str, password: str, name: str) -> str:
+async def register(email:str, password: str, name: str, surname: str, patronymic: str) -> str:
     is_in = await registration_service.get_user(email = email, password=password)
     if is_in == None:
-        task = await registration_service.put_user(email = email, password = password, name = name)
+        task = await registration_service.put_user(email = email, password = password, name = name, surname = surname, patronymic = patronymic)
         return ("Registration was succussful")
     else:
         return ("Registration failed, user with this email is already registered")

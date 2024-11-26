@@ -19,17 +19,18 @@ class UserRepository:
         self._sessionmaker = sqlite_connection()
         create_all_tables()
         
-    async def put_user(self, name:str, email:str, password:str) -> None:
-        is_admin = False
+    async def put_user(self, name:str, surname, patronymic, email:str, password:str) -> None:
+        is_admin = "False"
         if email in admin_emails:
-            is_admin = True
+            is_admin = "True"
         uuid = uuid4_as_str()
         token = str(Token.give_token(id = uuid))
         hashed_password = sha256()
         hashed_password.update(password.encode())
         hashed_password.update(os.getenv("SALT").encode())
-        email_num = await send_email()
-        stmp = insert(User).values({"id":uuid, "email":email, "name":name, "password":hashed_password.hexdigest(), "token":token, "is_admin" : is_admin, "email_num": email_num}) 
+        hashed_password = str(hashed_password.hexdigest())
+        #email_num = await send_email()
+        stmp = insert(User).values({"id" : uuid, "email" : email, "name" : name, "surname" : surname, "patronymic" : patronymic, "password" : hashed_password, "is_admin" : is_admin, "token" : token})
         
         async with self._sessionmaker() as session:
             await session.execute(stmp)

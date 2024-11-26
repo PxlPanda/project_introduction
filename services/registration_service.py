@@ -9,6 +9,6 @@ class UserService:
     async def check_admin(self, uuid):
         return await self.user_repository.check_admin(uuid = uuid)
     #async def get_user_token(self, )
-    async def put_user(self, name, email, password):
-        return await self.user_repository.put_user(name = name, email = email, password = password)
+    async def put_user(self, name, email, surname, patronymic, password):
+        return await self.user_repository.put_user(name = name,surname = surname, patronymic = patronymic, email = email, password = password)
     
