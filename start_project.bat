@@ -79,8 +79,8 @@ cd django_react
 pip install django-cors-headers
 pip install djangorestframework
 pip install djangorestframework-simplejwt
-pip install channels
 pip install channels-redis
+pip install django-channels
 pip install django-rest-framework
 pip install python-dotenv
 pip install -r requirements.txt

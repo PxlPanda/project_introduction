@@ -54,7 +54,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'leads',
     'Frontend',
-    'database',
     'update_build',
     'channels',  # Добавляем channels
 ]
