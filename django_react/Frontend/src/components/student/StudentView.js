@@ -17,11 +17,11 @@ const defaultHalls = {
       capacity: 20,
       timeSlotCapacity: {
         '9:00': { current: 0, max: 20 },
-        '10:50': { current: 5, max: 20 },
-        '12:40': { current: 8, max: 20 },
-        '14:30': { current: 15, max: 20 },
-        '16:30': { current: 12, max: 20 },
-        '18:20': { current: 3, max: 20 },
+        '10:50': { current: 0, max: 20 },
+        '12:40': { current: 0, max: 20 },
+        '14:30': { current: 0, max: 20 },
+        '16:30': { current: 0, max: 20 },
+        '18:20': { current: 0, max: 20 },
       }
     },
     {
@@ -29,12 +29,12 @@ const defaultHalls = {
       name: 'Игровой зал',
       capacity: 30,
       timeSlotCapacity: {
-        '9:00': { current: 10, max: 30 },
-        '10:50': { current: 15, max: 30 },
-        '12:40': { current: 20, max: 30 },
-        '14:30': { current: 25, max: 30 },
-        '16:30': { current: 18, max: 30 },
-        '18:20': { current: 8, max: 30 },
+        '9:00': { current: 0, max: 30 },
+        '10:50': { current: 0, max: 30 },
+        '12:40': { current: 0, max: 30 },
+        '14:30': { current: 0, max: 30 },
+        '16:30': { current: 0, max: 30 },
+        '18:20': { current: 0, max: 30 },
       }
     },
     {
@@ -42,12 +42,12 @@ const defaultHalls = {
       name: 'Зал для фитнеса',
       capacity: 15,
       timeSlotCapacity: {
-        '9:00': { current: 5, max: 15 },
-        '10:50': { current: 8, max: 15 },
-        '12:40': { current: 12, max: 15 },
-        '14:30': { current: 15, max: 15 },
-        '16:30': { current: 10, max: 15 },
-        '18:20': { current: 5, max: 15 },
+        '9:00': { current: 0, max: 15 },
+        '10:50': { current: 0, max: 15 },
+        '12:40': { current: 0, max: 15 },
+        '14:30': { current: 0, max: 15 },
+        '16:30': { current: 0, max: 15 },
+        '18:20': { current: 0, max: 15 },
       }
     },
     {
@@ -55,12 +55,12 @@ const defaultHalls = {
       name: 'Зал для бокса',
       capacity: 10,
       timeSlotCapacity: {
-        '9:00': { current: 2, max: 10 },
-        '10:50': { current: 4, max: 10 },
-        '12:40': { current: 6, max: 10 },
-        '14:30': { current: 8, max: 10 },
-        '16:30': { current: 5, max: 10 },
-        '18:20': { current: 3, max: 10 },
+        '9:00': { current: 0, max: 10 },
+        '10:50': { current: 0, max: 10 },
+        '12:40': { current: 0, max: 10 },
+        '14:30': { current: 0, max: 10 },
+        '16:30': { current: 0, max: 10 },
+        '18:20': { current: 0, max: 10 },
       }
     }
   ],
@@ -70,12 +70,12 @@ const defaultHalls = {
       name: 'Тренажерный зал',
       capacity: 25,
       timeSlotCapacity: {
-        '9:00': { current: 8, max: 25 },
-        '10:50': { current: 12, max: 25 },
-        '12:40': { current: 18, max: 25 },
-        '14:30': { current: 22, max: 25 },
-        '16:30': { current: 15, max: 25 },
-        '18:20': { current: 10, max: 25 },
+        '9:00': { current: 0, max: 25 },
+        '10:50': { current: 0, max: 25 },
+        '12:40': { current: 0, max: 25 },
+        '14:30': { current: 0, max: 25 },
+        '16:30': { current: 0, max: 25 },
+        '18:20': { current: 0, max: 25 },
       }
     },
     {
@@ -83,12 +83,12 @@ const defaultHalls = {
       name: 'Игровой зал',
       capacity: 35,
       timeSlotCapacity: {
-        '9:00': { current: 15, max: 35 },
-        '10:50': { current: 20, max: 35 },
-        '12:40': { current: 25, max: 35 },
-        '14:30': { current: 30, max: 35 },
-        '16:30': { current: 22, max: 35 },
-        '18:20': { current: 12, max: 35 },
+        '9:00': { current: 0, max: 35 },
+        '10:50': { current: 0, max: 35 },
+        '12:40': { current: 0, max: 35 },
+        '14:30': { current: 0, max: 35 },
+        '16:30': { current: 0, max: 35 },
+        '18:20': { current: 0, max: 35 },
       }
     },
     {
@@ -144,6 +144,40 @@ const StudentView = () => {
   });
   const searchInputRef = useRef(null);
 
+  const fetchUserBookings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token not found');
+        return;
+      }
+  
+      const response = await fetch('http://127.0.0.1:8000/api/leads/bookings/', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to fetch user bookings');
+      }
+  
+      const data = await response.json();
+      console.log('Received user bookings:', data);
+      setBookings(data.bookings.map(booking => ({
+        id: booking.id,
+        location: booking.location,
+        hall: booking.hall.name,
+        date: new Date(booking.date),
+        time: booking.time_slot
+      })));
+    } catch (error) {
+      console.error('Error fetching user bookings:', error);
+    }
+  };
+
   const fetchHallOccupancy = async (date, time = null) => {
     try {
       const token = localStorage.getItem('token');
@@ -171,12 +205,29 @@ const StudentView = () => {
       const data = await response.json();
       console.log('Received halls data:', data);
       
-      // Теперь данные уже содержат полную информацию о временных слотах
-      const updatedHalls = data.halls.map(hall => ({
-        ...hall,
-        timeSlotCapacity: hall.timeSlotCapacity // Используем данные как есть, они уже в нужном формате
-      }));
-      
+      // Обновляем только значения current в существующем defaultHalls
+      const updatedHalls = defaultHalls[selectedLocation === 'gorny' ? 'Горный' : 'Беляево'].map(hall => {
+        const serverHall = data.halls.find(h => h.name === hall.name);
+        if (serverHall) {
+          console.log(`Updating hall ${hall.name} with data:`, serverHall.timeSlotCapacity);
+          return {
+            ...hall,
+            timeSlotCapacity: {
+              ...hall.timeSlotCapacity,
+              ...Object.fromEntries(
+                Object.entries(serverHall.timeSlotCapacity).map(([time, capacity]) => [
+                  time,
+                  { current: capacity.current, max: hall.timeSlotCapacity[time].max }
+                ])
+              )
+            }
+          };
+        }
+        return hall;
+      });
+  
+      console.log('Updated halls:', updatedHalls);
+  
       setHalls(prevHalls => ({
         ...prevHalls,
         [selectedLocation]: updatedHalls
@@ -435,6 +486,28 @@ const StudentView = () => {
     return () => clearInterval(interval);
   }, []);
   
+  useEffect(() => {
+    // Создаем WebSocket соединение
+    const ws = new WebSocket('ws://127.0.0.1:8000/ws/bookings/');
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'booking_update') {
+        // Когда приходит уведомление о новой записи, обновляем данные
+        fetchHallOccupancy(selectedDate);
+      }
+    };
+  
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+  
+    // Закрываем соединение при размонтировании компонента
+    return () => {
+      ws.close();
+    };
+  }, []); // Создаем соединение один раз при монтировании компонента
+
   const getDayName = (date) => {
     if (!(date instanceof Date)) return '';
     return date.toLocaleDateString('ru-RU', { weekday: 'short' });
@@ -458,10 +531,19 @@ const StudentView = () => {
   };
 
   const handleTimeSelect = async (hallId, time) => {
-    setSelectedTimes(prev => ({
-      ...prev,
-      [hallId]: time
-    }));
+    // Если время уже выбрано, отменяем выбор
+    if (selectedTimes[hallId] === time) {
+      setSelectedTimes(prev => ({
+        ...prev,
+        [hallId]: null
+      }));
+    } else {
+      // Иначе выбираем новое время
+      setSelectedTimes(prev => ({
+        ...prev,
+        [hallId]: time
+      }));
+    }
     
     // Обновляем данные о загруженности при выборе времени
     if (selectedDate) {
@@ -473,17 +555,52 @@ const StudentView = () => {
     return selectedWeek === 1 && !isNextWeekBookingAllowed();
   };
 
-  const handleBooking = (hallId) => {
-    const hall = HALLS[selectedLocation].find(h => h.id === hallId);
-    const newBooking = {
-      id: Date.now(),
-      location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево',
-      hall: hall.name,
-      date: selectedDate,
-      time: selectedTimes[hallId]
-    };
-    setBookings([...bookings, newBooking]);
-    setSelectedTimes({ ...selectedTimes, [hallId]: null });
+  const handleBooking = async (hallId) => {
+    try {
+      const hall = HALLS[selectedLocation].find(h => h.id === hallId);
+      const token = localStorage.getItem('token');
+      
+      // Отправляем запись на сервер
+      const response = await fetch('http://127.0.0.1:8000/api/bookings/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          hall_id: hallId,
+          date: selectedDate.toISOString().split('T')[0],
+          time_slot: selectedTimes[hallId],
+          location: selectedLocation
+        })
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to create booking');
+      }
+  
+      const data = await response.json();
+      console.log('Booking created:', data);
+  
+      // Добавляем новую запись в локальное состояние
+      const newBooking = {
+        id: data.id,
+        location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево',
+        hall: hall.name,
+        date: selectedDate,
+        time: selectedTimes[hallId]
+      };
+      setBookings(prev => [...prev, newBooking]);
+      setSelectedTimes({ ...selectedTimes, [hallId]: null });
+      
+      // Обновляем данные о занятости
+      await fetchHallOccupancy(selectedDate);
+      
+      showNotification('Запись успешно создана');
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      showNotification('Ошибка при создании записи');
+    }
   };
 
   const showNotification = (message) => {
@@ -644,6 +761,16 @@ const StudentView = () => {
       fetchHallOccupancy(selectedDate, currentTime);
     }
   }, [selectedDate, selectedLocation, selectedTimes]);
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchUserBookings();
+      if (selectedDate) {
+        await fetchHallOccupancy(selectedDate);
+      }
+    };
+    init();
+  }, [selectedDate, selectedLocation]);
   
   // Компонент модального окна истории
   const HistoryModal = () => (
@@ -862,7 +989,7 @@ const StudentView = () => {
                           key={time}
                           className={`time-slot ${selectedTimes[hall.id] === time ? 'selected' : ''}`}
                           onClick={() => handleTimeSelect(hall.id, time)}
-                          disabled={isBooked || isPast}
+                          disabled={isPast}
                           style={
                             isPast ? {
                               backgroundColor: '#f5f5f5',
@@ -876,7 +1003,7 @@ const StudentView = () => {
                               backgroundColor: '#ffebee',
                               border: '1px solid #ffcdd2',
                               color: '#d32f2f',
-                              cursor: 'not-allowed',
+                              cursor: 'pointer',
                               minWidth: '90px',
                               width: '90px',
                               padding: '8px 4px'
@@ -884,6 +1011,7 @@ const StudentView = () => {
                               backgroundColor: '#e3f2fd',
                               border: '1px solid #90caf9',
                               color: '#1976d2',
+                              cursor: 'pointer',
                               minWidth: '90px',
                               width: '90px',
                               padding: '8px 4px'
@@ -891,14 +1019,15 @@ const StudentView = () => {
                               backgroundColor: '#eeeeee',
                               border: '1px solid #bdbdbd',
                               color: '#757575',
-                              cursor: 'not-allowed',
+                              cursor: 'pointer',
                               minWidth: '90px',
                               width: '90px',
                               padding: '8px 4px'
                             } : {
                               minWidth: '90px',
                               width: '90px',
-                              padding: '8px 4px'
+                              padding: '8px 4px',
+                              cursor: 'pointer'
                             }
                           }
                         >

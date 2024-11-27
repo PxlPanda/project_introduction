@@ -77,6 +77,12 @@ call venv\Scripts\activate
 echo Installing Django dependencies...
 cd django_react
 pip install django-cors-headers
+pip install djangorestframework
+pip install djangorestframework-simplejwt
+pip install channels
+pip install channels-redis
+pip install django-rest-framework
+pip install python-dotenv
 pip install -r requirements.txt
 
 :: Проверяем настройки CORS в settings.py
@@ -111,6 +117,13 @@ cd Frontend
 if not exist "node_modules" (
     echo Installing React dependencies...
     npm install
+    npm install @material-ui/core
+    npm install @material-ui/icons
+    npm install @emotion/react
+    npm install @emotion/styled
+    npm install axios
+    npm install react-router-dom
+    npm install date-fns
 )
 
 :: Запускаем backend и frontend

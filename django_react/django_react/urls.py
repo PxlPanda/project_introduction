@@ -1,8 +1,7 @@
 from django.urls import path, re_path, include
 from django.views.static import serve
-from . import views
 from django.conf import settings
-from rest_framework_simplejwt.views import TokenRefreshView
+from . import views
 import os
 
 urlpatterns = [
@@ -10,17 +9,20 @@ urlpatterns = [
     path('api/server-time/', views.get_server_time, name='server_time'),
     path('api/students/', views.get_students, name='get_students'),
     path('api/save-points/', views.save_points, name='save_points'),
-    path('api/student-data/', views.get_student_data, name='student_data'),  # Новый endpoint
-    path('api/login/', views.login_api, name='login'),  # Убедимся, что этот URL здесь
+    path('api/student-data/', views.get_student_data, name='student_data'),
+    path('api/login/', views.login_api, name='login'),
     path('api/register-teacher/', views.register_teacher, name='register_teacher'),
     path('api/register-student/', views.register_student, name='register-student'),
-    path('api/halls/', views.get_halls, name='get_halls'),  # Добавляем новый маршрут
+    path('api/halls/', views.get_halls, name='get_halls'),
+    
+    # Leads app URLs
+    path('api/leads/', include('leads.urls')),
     
     # Static files
-    path('manifest.json', views.serve_manifest, name='serve_manifest'),
-    path('logo192.png', lambda request: serve(request, os.path.join('public', 'logo192.png'), document_root=settings.REACT_APP_DIR)),
-    path('logo512.png', lambda request: serve(request, os.path.join('public', 'logo512.png'), document_root=settings.REACT_APP_DIR)),
-    path('favicon.ico', lambda request: serve(request, os.path.join('public', 'favicon.ico'), document_root=settings.REACT_APP_DIR)),
+    path('manifest.json', serve, {'document_root': settings.REACT_APP_DIR, 'path': 'public/manifest.json'}),
+    path('logo192.png', serve, {'document_root': settings.REACT_APP_DIR, 'path': 'public/logo192.png'}),
+    path('logo512.png', serve, {'document_root': settings.REACT_APP_DIR, 'path': 'public/logo512.png'}),
+    path('favicon.ico', serve, {'document_root': settings.REACT_APP_DIR, 'path': 'public/favicon.ico'}),
     
     # React app catch-all - должен быть последним
     re_path(r'^(?!api/).*$', views.index, name='index'),

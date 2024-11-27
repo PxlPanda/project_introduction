@@ -21,7 +21,7 @@ from django.shortcuts import render, redirect
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth import authenticate, login
-from leads.models import Teacher, Student, PointsHistory, Booking
+from leads.models import Teacher, Student, PointsHistory, Booking, Hall
 from leads.serializers import TeacherSerializer, StudentSerializer
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -33,6 +33,8 @@ from leads.models import User, Teacher
 from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 logger = logging.getLogger(__name__)
 
@@ -391,6 +393,7 @@ def register_teacher(request):
 
 # Авторизация пользователя
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def login_user(request):
     """
     Авторизация пользователя (преподавателя или студента).
@@ -502,9 +505,6 @@ HALLS = [
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_halls(request):
-    """
-    Получение информации о залах для записи на занятия.
-    """
     try:
         date_str = request.GET.get('date')
         location = request.GET.get('location', 'gorny')
@@ -521,50 +521,92 @@ def get_halls(request):
         }
         location = location_mapping.get(location, location)
         
-        # Получаем записи на занятия для этой даты
-        try:
-            bookings = Booking.objects.filter(
-                date=date_str,
-                hall__location__name=location  # Используем связь через модель Hall
-            )
-            logger.info(f"Найдено {bookings.count()} бронирований")
-        except Exception as e:
-            logger.error(f"Ошибка при получении бронирований: {str(e)}")
-            bookings = []
+        # Отладочная информация
+        all_halls = Hall.objects.all()
+        logger.info(f"Всего залов в базе: {all_halls.count()}")
+        for hall in all_halls:
+            logger.info(f"Зал: {hall.name}, Локация: {hall.location.name if hall.location else 'Нет локации'}")
+        
+        # Получаем все залы для данной локации
+        halls = Hall.objects.filter(location__name=location)
+        logger.info(f"Найдено залов для локации {location}: {halls.count()}")
+        
+        # Если залов нет, используем дефолтные значения
+        if not halls.exists():
+            logger.warning(f"Залы не найдены в базе данных для локации {location}. Используем дефолтные значения.")
+            default_halls = [
+                {
+                    'id': 1,
+                    'name': 'Тренажерный зал',
+                    'max_capacity': 20,
+                },
+                {
+                    'id': 2,
+                    'name': 'Игровой зал',
+                    'max_capacity': 30,
+                },
+                {
+                    'id': 3,
+                    'name': 'Зал для фитнеса',
+                    'max_capacity': 15,
+                }
+            ]
+            halls = default_halls
         
         # Создаем словарь для подсчета загруженности
         hall_occupancy = {}
         time_slots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20']
         
-        # Инициализируем счетчики для всех временных слотов
-        for hall in HALLS:
-            hall_name = hall['name']
+        # Инициализируем счетчики для всех временных слотов - всегда начинаем с 0
+        for hall in halls:
+            hall_name = hall['name'] if isinstance(hall, dict) else hall.name
             if hall_name not in hall_occupancy:
                 hall_occupancy[hall_name] = {time: 0 for time in time_slots}
         
         # Подсчитываем текущую загруженность для каждого зала и времени
-        for booking in bookings:
-            time_str = booking.time_slot.strftime('%H:%M')  # Преобразуем TimeField в строку
-            if booking.hall.name in hall_occupancy and time_str in hall_occupancy[booking.hall.name]:
-                hall_occupancy[booking.hall.name][time_str] += 1
+        try:
+            bookings = Booking.objects.filter(
+                date=date_str,
+                hall__location__name=location
+            )
+            logger.info(f"Найдено {bookings.count()} бронирований")
+            
+            # Обновляем счетчики только если есть реальные записи
+            for booking in bookings:
+                time_str = booking.time_slot.strftime('%H:%M')
+                if booking.hall.name in hall_occupancy and time_str in hall_occupancy[booking.hall.name]:
+                    hall_occupancy[booking.hall.name][time_str] += 1
+                    
+        except Exception as e:
+            logger.error(f"Ошибка при получении бронирований: {str(e)}")
         
-        # Обновляем информацию о залах с текущей загруженностью
+        # Формируем ответ с данными о залах
         halls_data = []
-        for hall in HALLS:
-            hall_copy = hall.copy()
-            hall_copy['timeSlotCapacity'] = {
-                time: {
-                    'current': hall_occupancy[hall['name']][time],
-                    'max': hall['max_capacity']
-                } for time in time_slots
+        for hall in halls:
+            hall_name = hall['name'] if isinstance(hall, dict) else hall.name
+            hall_max_capacity = hall['max_capacity'] if isinstance(hall, dict) else hall.capacity
+            hall_id = hall['id'] if isinstance(hall, dict) else hall.id
+            
+            hall_data = {
+                'id': hall_id,
+                'name': hall_name,
+                'max_capacity': hall_max_capacity,
+                'timeSlotCapacity': {
+                    time: {
+                        'current': hall_occupancy[hall_name][time],  # Всегда будет 0, если нет записей
+                        'max': hall_max_capacity
+                    } for time in time_slots
+                }
             }
-            halls_data.append(hall_copy)
+            halls_data.append(hall_data)
         
         logger.info(f"Подготовлен ответ с {len(halls_data)} залами")
         return Response({'halls': halls_data}, status=status.HTTP_200_OK)
         
     except Exception as e:
         logger.error(f"Ошибка при обработке запроса get_halls: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return Response(
             {'error': f'Internal server error: {str(e)}'}, 
             status=status.HTTP_400_BAD_REQUEST
@@ -709,5 +751,71 @@ def get_student_data(request):
         logger.error(f"Traceback: {traceback.format_exc()}")
         return Response(
             {'error': 'Internal server error', 'detail': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_booking(request):
+    """
+    API endpoint для создания новой записи на занятие
+    """
+    try:
+        # Получаем данные из запроса
+        hall_name = request.data.get('hall_name')
+        date = request.data.get('date')
+        time = request.data.get('time')
+
+        # Проверяем обязательные поля
+        if not all([hall_name, date, time]):
+            return Response(
+                {'error': 'Необходимо указать hall_name, date и time'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Находим зал
+        try:
+            hall = Hall.objects.get(name=hall_name)
+        except Hall.DoesNotExist:
+            return Response(
+                {'error': 'Зал не найден'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Создаем новую запись
+        booking = Booking.objects.create(
+            hall=hall,
+            date=date,
+            time_slot=time,
+            user=request.user
+        )
+
+        # Отправляем WebSocket уведомление
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "bookings",
+            {
+                "type": "booking_update",
+                "data": {
+                    "hall": hall_name,
+                    "date": date,
+                    "time": time
+                }
+            }
+        )
+
+        return Response({
+            'message': 'Запись успешно создана',
+            'booking': {
+                'id': booking.id,
+                'hall': hall_name,
+                'date': date,
+                'time': time
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
