@@ -58,3 +58,43 @@ $RECYCLE.BIN/
 # Личные настройки
 .env
 *.bak
+
+# Временные файлы
+argv.json
+query
+*.exe
+/django_react/node_modules/
+/django_react/package.json
+/django_react/package-lock.json
+/django_react/query
+/django_react/staticfiles/
+
+# Кэш и временные файлы
+*.pyc
+*.pyo
+*.pyd
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+
+# База данных SQLite
+*.sqlite3
+*.sqlite3-journal
+
+# Виртуальное окружение
+.venv
+venv/
+ENV/
+
+# Файлы сборки
+*.manifest
+*.spec
