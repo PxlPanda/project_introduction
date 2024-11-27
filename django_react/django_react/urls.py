@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/server-time/', views.get_server_time, name='server_time'),
     path('api/students/', views.get_students, name='get_students'),
     path('api/save-points/', views.save_points, name='save_points'),
+    path('api/student-data/', views.get_student_data, name='student_data'),  # Новый endpoint
     path('api/login/', views.login_api, name='login'),  # Убедимся, что этот URL здесь
     path('api/register-teacher/', views.register_teacher, name='register_teacher'),
     path('api/register-student/', views.register_student, name='register-student'),

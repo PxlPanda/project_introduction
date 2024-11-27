@@ -115,6 +115,14 @@ const HALLS = {
 const StudentView = () => {
   console.log('StudentView rendering');  // Добавьте эту строку в начало компонента
 
+  const [studentProfile, setStudentProfile] = useState({
+    fullName: '',
+    group: '',
+    studentId: ''
+  });
+  
+  const [pointsHistory, setPointsHistory] = useState([]);  // Для истории баллов
+  const [currentPoints, setCurrentPoints] = useState(0);  // Для текущих баллов
   const [serverTime, setServerTime] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState('gorny');
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -132,6 +140,124 @@ const StudentView = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
 
+
+
+  // Функция fetchStudentProfile
+  const fetchStudentProfile = async () => {
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token not found');
+        window.location.href = '/login';
+        return;
+      }
+  
+      console.log('Fetching student profile with token:', token);
+      const response = await fetch('http://127.0.0.1:8000/api/student-data/', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+  
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.error('Unauthorized access');
+          localStorage.removeItem('token');
+          localStorage.removeItem('userData');
+          window.location.href = '/login';
+          return;
+        }
+        throw new Error('Failed to fetch student data');
+      }
+  
+      const data = await response.json();
+      console.log('Received student data:', data);
+      
+      
+      setStudentProfile({
+        fullName: data.full_name,
+        group: data.group,
+        studentId: data.student_id
+      });
+
+      const profileData = {
+        fullName: data.full_name,
+        group: data.group,
+        studentId: data.student_id
+      };
+      console.log('Setting profile data:', profileData);
+      setStudentProfile(profileData);
+
+      setPointsHistory(data.points_history?.map(record => ({
+        id: record.id,
+        date: new Date(record.date).toLocaleString(),
+        points: record.points,
+        reason: record.reason,
+        type: record.type,
+        awardedBy: record.awarded_by
+      })) || []);
+      setCurrentPoints(data.current_points || 0);
+    } catch (error) {
+      console.error('Error fetching student data:', error);
+      setStudentProfile({
+        fullName: 'Не указано',
+        group: 'Не указана',
+        studentId: 'Не указан'
+      });
+      setPointsHistory([]);
+      setCurrentPoints(0);
+    }
+  };
+
+// JSX для отображения профиля (вставьте в return компонента)
+<div className="student-profile" style={{
+  padding: '20px',
+  backgroundColor: '#fff',
+  borderRadius: '8px',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+  marginBottom: '20px'
+}}>
+  <h2 style={{ color: '#333', marginBottom: '15px' }}>Профиль студента</h2>
+  <div style={{ marginBottom: '10px' }}>
+    <strong>ФИО:</strong> {studentProfile?.fullName || 'Не указано'}
+  </div>
+  <div style={{ marginBottom: '10px' }}>
+    <strong>Группа:</strong> {studentProfile?.group || 'Не указана'}
+  </div>
+  <div style={{ marginBottom: '10px' }}>
+    <strong>Номер студенческого:</strong> {studentProfile?.studentId || 'Не указан'}
+  </div>
+
+  <div className="points-history-section">
+    <h3>История баллов</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Баллы</th>
+          <th>Причина</th>
+          <th>Тип</th>
+          <th>Кем начислено</th>
+        </tr>
+      </thead>
+      <tbody>
+        {pointsHistory.map((record) => (
+          <tr key={record.id}>
+            <td>{record.date}</td>
+            <td>{record.points}</td>
+            <td>{record.reason}</td>
+            <td>{record.type}</td>
+            <td>{record.awardedBy || 'Система'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+
   const fetchServerTime = async () => {
     try {
       console.log('Fetching server time...');
@@ -147,6 +273,20 @@ const StudentView = () => {
       return new Date(); // Fallback to local time if server request fails
     }
   };
+
+  useEffect(() => {
+    if (userData) {
+      fetchStudentProfile();
+    }
+  }, [userData]);
+
+  useEffect(() => {
+    fetchStudentProfile();
+  }, []);
+
+  useEffect(() => {
+    console.log('studentProfile changed:', studentProfile);
+  }, [studentProfile]);
 
   useEffect(() => {
     console.log('Server Time:', serverTime);
@@ -360,90 +500,6 @@ const StudentView = () => {
     today.setHours(0, 0, 0, 0);
     return new Date(date) < today;
   };
-
-  // Временные данные истории (в будущем будут приходить с сервера)
-  const pointsHistory = [
-    {
-      id: 1,
-      date: '2024-01-15',
-      points: 2,
-      type: 'Тренажерный зал',
-      location: 'Горный',
-      comment: null
-    },
-    {
-      id: 2,
-      date: '2024-01-16',
-      points: 3,
-      type: 'Секция по волейболу',
-      location: 'Беляево',
-      comment: 'Участие в секции по волейболу'
-    },
-    {
-      id: 3,
-      date: '2024-01-17',
-      points: 2,
-      type: 'Бассейн',
-      location: 'Беляево',
-      comment: null
-    },
-    {
-      id: 4,
-      date: '2024-01-18',
-      points: 3,
-      type: 'Секция по баскетболу',
-      location: 'Горный',
-      comment: 'Тренировка сборной института'
-    },
-    {
-      id: 5,
-      date: '2024-01-19',
-      points: 2,
-      type: 'Тренажерный зал',
-      location: 'Беляево',
-      comment: null
-    },
-    {
-      id: 6,
-      date: '2024-01-20',
-      points: 3,
-      type: 'Соревнования',
-      location: 'Горный',
-      comment: 'Участие в межфакультетских соревнованиях'
-    },
-    {
-      id: 7,
-      date: '2024-01-21',
-      points: 4,
-      type: 'Спартакиада',
-      location: 'Горный',
-      comment: 'Победа в командных соревнованиях'
-    },
-    {
-      id: 8,
-      date: '2024-01-22',
-      points: 2,
-      type: 'Бассейн',
-      location: 'Беляево',
-      comment: null
-    },
-    {
-      id: 9,
-      date: '2024-01-23',
-      points: 3,
-      type: 'Секция по теннису',
-      location: 'Горный',
-      comment: 'Тренировка начинающих'
-    },
-    {
-      id: 10,
-      date: '2024-01-24',
-      points: 2,
-      type: 'Тренажерный зал',
-      location: 'Горный',
-      comment: null
-    }
-  ];
 
   // Функция для фильтрации записей истории
   const filteredHistory = pointsHistory.filter(record => {
@@ -845,24 +901,30 @@ const StudentView = () => {
                   </div>
                 </div>
               </div>
-            ))}
+          ))}
           </div>
-
+  
           <div className="bookings-section">
             <div className="profile-section">
               <div className="profile-header">
                 <div className="profile-info">
-                  <div className="profile-name" style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px', color: '#333' }}>{userData?.fullName || 'ФИО не указано'}</div>
-                  <div className="profile-group" style={{ fontSize: '14px', marginBottom: '4px', color: '#555' }}>Группа: {userData?.group || 'Не указана'}</div>
-                  <div className="profile-student-id" style={{ fontSize: '14px', color: '#555' }}>Студ. билет: {userData?.studentId || 'Не указан'}</div>
+                  <div className="profile-name" style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px', color: '#333' }}>
+                    {studentProfile?.fullName || 'ФИО не указано'}
+                  </div>
+                  <div className="profile-group" style={{ fontSize: '14px', marginBottom: '4px', color: '#555' }}>
+                    Группа: {studentProfile?.group || 'Не указана'}
+                  </div>
+                  <div className="profile-student-id" style={{ fontSize: '14px', color: '#555' }}>
+                    Студ. билет: {studentProfile?.studentId || 'Не указан'}
+                  </div>
                 </div>
               </div>
             </div>
-
+  
             <div className="points-section" style={{ margin: '20px 0', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
               <div style={{ marginBottom: '8px', color: '#333', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Текущие баллы</span>
-                <span>{userData?.points || 0} / 100</span>
+                <span>{currentPoints} / 100</span>
               </div>
               <div style={{ width: '100%', height: '8px', backgroundColor: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
                 <div 

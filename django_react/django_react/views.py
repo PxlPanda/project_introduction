@@ -574,3 +574,58 @@ def award_points_manually(request):
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_data(request):
+    """
+    API endpoint для получения данных профиля студента
+    """
+    try:
+        logger.info(f"Получен запрос на данные студента от пользователя: {request.user.email}")
+        
+        # Получаем студента по текущему пользователю
+        student = Student.objects.get(user=request.user)
+        logger.info(f"Найден студент: {student.user.full_name}")
+        
+        # Получаем историю баллов
+        points_history = PointsHistory.objects.filter(student=student).order_by('-date')
+        logger.info(f"Получена история баллов: {points_history.count()} записей")
+        
+        # Подготавливаем данные истории
+        history_data = [{
+            'id': record.id,
+            'date': record.date.strftime('%Y-%m-%d %H:%M:%S'),
+            'points': record.points,
+            'reason': record.reason,
+            'type': record.points_type,
+            'awarded_by': record.awarded_by.user.full_name if record.awarded_by else None
+        } for record in points_history]
+        
+        # Формируем ответ
+        response_data = {
+            'full_name': student.user.full_name,
+            'group': student.group_name,  
+            'student_id': student.student_number,  
+            'current_points': student.points,
+            'points_history': history_data
+        }
+        
+        logger.info("Данные успешно подготовлены")
+        return Response(response_data)
+        
+    except Student.DoesNotExist:
+        logger.error(f"Студент не найден для пользователя: {request.user.email}")
+        return Response(
+            {'error': 'Student not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Ошибка в get_student_data: {str(e)}")
+        logger.error(f"Тип ошибки: {type(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return Response(
+            {'error': 'Internal server error', 'detail': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
