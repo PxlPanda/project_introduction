@@ -138,9 +138,53 @@ const StudentView = () => {
   const [selectedWeek, setSelectedWeek] = useState(0); // 0 - текущая неделя, 1 - следующая
   const [userData, setUserData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [halls, setHalls] = useState({
+    gorny: [],
+    belyaevo: []
+  });
   const searchInputRef = useRef(null);
 
-
+  const fetchHallOccupancy = async (date, time = null) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token not found');
+        return;
+      }
+  
+      const formattedDate = date.toISOString().split('T')[0];
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/halls/?date=${formattedDate}&location=${selectedLocation}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Token ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error('Failed to fetch hall occupancy');
+      }
+  
+      const data = await response.json();
+      console.log('Received halls data:', data);
+      
+      // Теперь данные уже содержат полную информацию о временных слотах
+      const updatedHalls = data.halls.map(hall => ({
+        ...hall,
+        timeSlotCapacity: hall.timeSlotCapacity // Используем данные как есть, они уже в нужном формате
+      }));
+      
+      setHalls(prevHalls => ({
+        ...prevHalls,
+        [selectedLocation]: updatedHalls
+      }));
+    } catch (error) {
+      console.error('Error fetching hall occupancy:', error);
+    }
+  };
 
   // Функция fetchStudentProfile
   const fetchStudentProfile = async () => {
@@ -275,6 +319,12 @@ const StudentView = () => {
   };
 
   useEffect(() => {
+    if (selectedDate) {
+      fetchHallOccupancy(selectedDate);
+    }
+  }, [selectedDate, selectedLocation]);
+
+  useEffect(() => {
     if (userData) {
       fetchStudentProfile();
     }
@@ -407,11 +457,16 @@ const StudentView = () => {
     setSelectedTimes({});
   };
 
-  const handleTimeSelect = (hallId, time) => {
+  const handleTimeSelect = async (hallId, time) => {
     setSelectedTimes(prev => ({
       ...prev,
       [hallId]: time
     }));
+    
+    // Обновляем данные о загруженности при выборе времени
+    if (selectedDate) {
+      await fetchHallOccupancy(selectedDate, time);
+    }
   };
 
   const isBookingDisabled = () => {
@@ -583,6 +638,13 @@ const StudentView = () => {
     }
   }, [selectedWeek]);
 
+  useEffect(() => {
+    if (selectedDate) {
+      const currentTime = Object.values(selectedTimes)[0];
+      fetchHallOccupancy(selectedDate, currentTime);
+    }
+  }, [selectedDate, selectedLocation, selectedTimes]);
+  
   // Компонент модального окна истории
   const HistoryModal = () => (
     <div className="modal-overlay" style={{

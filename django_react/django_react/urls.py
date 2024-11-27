@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/login/', views.login_api, name='login'),  # Убедимся, что этот URL здесь
     path('api/register-teacher/', views.register_teacher, name='register_teacher'),
     path('api/register-student/', views.register_student, name='register-student'),
+    path('api/halls/', views.get_halls, name='get_halls'),  # Добавляем новый маршрут
     
     # Static files
     path('manifest.json', views.serve_manifest, name='serve_manifest'),

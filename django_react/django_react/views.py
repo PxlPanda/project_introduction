@@ -1,8 +1,27 @@
+# Определяем список залов
+HALLS = [
+    {
+        'name': 'Тренажерный зал',
+        'max_capacity': 20,
+        'time_slots': ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20']
+    },
+    {
+        'name': 'Игровой зал',
+        'max_capacity': 30,
+        'time_slots': ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20']
+    },
+    {
+        'name': 'Зал для фитнеса',
+        'max_capacity': 15,
+        'time_slots': ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20']
+    }
+]
+
 from django.shortcuts import render, redirect
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth import authenticate, login
-from leads.models import Teacher, Student, PointsHistory
+from leads.models import Teacher, Student, PointsHistory, Booking
 from leads.serializers import TeacherSerializer, StudentSerializer
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -481,13 +500,76 @@ HALLS = [
 
 # Функция для получения информации о залах
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_halls(request):
     """
     Получение информации о залах для записи на занятия.
     """
-    return Response({'halls': HALLS}, status=status.HTTP_200_OK)
+    try:
+        date_str = request.GET.get('date')
+        location = request.GET.get('location', 'gorny')
+        
+        logger.info(f"Получен запрос на получение залов. Дата: {date_str}, Локация: {location}")
+        
+        if not date_str:
+            return Response({'error': 'Date parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Конвертируем location в правильный формат
+        location_mapping = {
+            'gorny': 'Горный',
+            'belyaevo': 'Беляево'
+        }
+        location = location_mapping.get(location, location)
+        
+        # Получаем записи на занятия для этой даты
+        try:
+            bookings = Booking.objects.filter(
+                date=date_str,
+                hall__location__name=location  # Используем связь через модель Hall
+            )
+            logger.info(f"Найдено {bookings.count()} бронирований")
+        except Exception as e:
+            logger.error(f"Ошибка при получении бронирований: {str(e)}")
+            bookings = []
+        
+        # Создаем словарь для подсчета загруженности
+        hall_occupancy = {}
+        time_slots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20']
+        
+        # Инициализируем счетчики для всех временных слотов
+        for hall in HALLS:
+            hall_name = hall['name']
+            if hall_name not in hall_occupancy:
+                hall_occupancy[hall_name] = {time: 0 for time in time_slots}
+        
+        # Подсчитываем текущую загруженность для каждого зала и времени
+        for booking in bookings:
+            time_str = booking.time_slot.strftime('%H:%M')  # Преобразуем TimeField в строку
+            if booking.hall.name in hall_occupancy and time_str in hall_occupancy[booking.hall.name]:
+                hall_occupancy[booking.hall.name][time_str] += 1
+        
+        # Обновляем информацию о залах с текущей загруженностью
+        halls_data = []
+        for hall in HALLS:
+            hall_copy = hall.copy()
+            hall_copy['timeSlotCapacity'] = {
+                time: {
+                    'current': hall_occupancy[hall['name']][time],
+                    'max': hall['max_capacity']
+                } for time in time_slots
+            }
+            halls_data.append(hall_copy)
+        
+        logger.info(f"Подготовлен ответ с {len(halls_data)} залами")
+        return Response({'halls': halls_data}, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке запроса get_halls: {str(e)}")
+        return Response(
+            {'error': f'Internal server error: {str(e)}'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-# Serve manifest.json file
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def serve_manifest(request):
