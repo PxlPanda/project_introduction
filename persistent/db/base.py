@@ -1,8 +1,12 @@
 from sqlalchemy import MetaData
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 import uuid
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    ...
+
+
 
 
 def uuid4_as_str() -> str:

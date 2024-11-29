@@ -10,8 +10,9 @@ load_dotenv()
 class Token():
     def __init__(self):
         ...
-    def give_token(id):
+    async def give_token(id):
         token = jwt.encode(claims={"sub": id}, key=os.getenv("JWT_SECRET"), algorithm="HS256")
+        print(token)
         return token
     async def check_access_token(
         request: Request,

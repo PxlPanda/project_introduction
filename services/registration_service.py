@@ -6,6 +6,8 @@ class UserService:
         
     async def get_user(self, email: str, password: str)-> str|None:
         return await self.user_repository.get_user(email = email, password = password)
+    async def check_user(self, email: str):
+        return await self.user_repository.check_user(email = email)
     async def check_admin(self, uuid):
         return await self.user_repository.check_admin(uuid = uuid)
     #async def get_user_token(self, )

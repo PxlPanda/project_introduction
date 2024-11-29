@@ -1,5 +1,6 @@
 from persistent.db.base import Base
-from sqlalchemy import Column, Integer, Text, Boolean
+from sqlalchemy import Column, Integer, Text, Boolean, MetaData
+
 
 
 class TTable(Base):

@@ -1,5 +1,5 @@
 from persistent.db.Users import User
-from infrastructure.sql.connect import sqlite_connection, create_all_tables
+from infrastructure.sql.connect import sqlite_connection, create_all_sqlite_tables, psyco_connection, create_all_psyco_tables
 from sqlalchemy import insert, select
 from User_aut.auth import Token
 from persistent.db.base import uuid4_as_str
@@ -16,8 +16,8 @@ admin_emails = set(os.getenv("ADMIN_EMAILS").split("|"))
 
 class UserRepository:
     def __init__(self) -> None:
-        self._sessionmaker = sqlite_connection()
-        create_all_tables()
+        self._sessionmaker = psyco_connection()
+        create_all_psyco_tables()
         
     async def put_user(self, name:str, surname, patronymic, email:str, password:str) -> None:
         is_admin = "False"
@@ -50,6 +50,20 @@ class UserRepository:
             return None
         else:
             return row[0]
+
+
+    async def check_user(self, email:str) -> str|None:
+        stmp = select(User.id).where(User.email == email).limit(1)
+            
+        async with self._sessionmaker() as session:
+            resp = await session.execute(stmp)
+            
+        row = resp.fetchone()
+        if row is None:
+            return None
+        else:
+            return row[0]
+        
         
     #kak po DRY?
     async def check_admin(self, uuid:str) -> str|None:

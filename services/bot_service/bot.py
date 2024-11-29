@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher, F
 import os
 from dotenv import load_dotenv#type:ignore
 
-from handlers import router
+from .handlers import router
  
 
 load_dotenv()
@@ -16,6 +16,4 @@ async def main():
     dp.include_router(router)
     await dp.start_polling(bot)#начинаем обращаться к серверу телеграм за обновлениями
         
-
-asyncio.run(main())
 

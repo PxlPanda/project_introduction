@@ -1,5 +1,5 @@
 from persistent.db.TimeTable import TTable
-from infrastructure.sql.connect import sqlite_connection, create_all_tables
+from infrastructure.sql.connect import sqlite_connection, create_all_sqlite_tables, psyco_connection, create_all_psyco_tables
 from sqlalchemy import insert, select, update
 import asyncio
 from repositories.db.user_repository import UserRepository#type: ignore
@@ -11,15 +11,13 @@ load_dotenv()
 
 class TtableRepository:
     def __init__(self):
-        self.sessionmaker = sqlite_connection()
+        self.sessionmaker = psyco_connection()
         self.userrepository = UserRepository()
-        create_all_tables()
+        create_all_psyco_tables()
     
     
     async def put_time(self, time:str, uuid:str):
-        print(await self.check_free_time(time))
         if await self.check_free_time(time):
-            print(2)
             stmp = select(TTable.by_whom).where(TTable.time == time)
             async with self.sessionmaker() as session:
                 current_users = await session.execute(stmp)
@@ -46,7 +44,7 @@ class TtableRepository:
         async with self.sessionmaker() as session:
             resp = await session.execute(stmp)
             await session.commit()
-        resp = resp.fetchone()[0]
+        resp = resp.fetchone()
         if resp == True:
             return True
         else:
