@@ -6,9 +6,6 @@ import '../styles/buttons.css';
 import '../styles/header.css';
 import '../styles/calendar.css';
 
-// Временные данные о занятости (в будущем будут приходить с сервера)
-const timeSlots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
-
 const defaultHalls = {
   'Горный': [
     {
@@ -112,6 +109,9 @@ const HALLS = {
   belyaevo: defaultHalls['Беляево']
 };
 
+// Временные слоты
+const timeSlots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
+
 const StudentView = () => {
   console.log('StudentView rendering');  // Добавьте эту строку в начало компонента
 
@@ -126,9 +126,9 @@ const StudentView = () => {
   const [serverTime, setServerTime] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState('gorny');
   const [selectedDate, setSelectedDate] = useState(() => {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    return date;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
   });
   const [selectedTimes, setSelectedTimes] = useState({});
   const [bookings, setBookings] = useState([]);
@@ -138,11 +138,115 @@ const StudentView = () => {
   const [selectedWeek, setSelectedWeek] = useState(0); // 0 - текущая неделя, 1 - следующая
   const [userData, setUserData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef(null);
   const [halls, setHalls] = useState({
     gorny: [],
     belyaevo: []
   });
-  const searchInputRef = useRef(null);
+  const fetchHalls = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token not found');
+        return;
+      }
+  
+      // Преобразуем значение локации
+      const locationName = selectedLocation === 'gorny' ? 'Горный' : 'Беляево';
+  
+      const response = await fetch(
+        `http://127.0.0.1:8000/leads/halls/?location=${encodeURIComponent(locationName)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`, // Изменено с Token на Bearer
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+  
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch halls');
+      }
+  
+      const data = await response.json();
+      
+      // Преобразуем данные в нужный формат
+      const formattedHalls = data.map(hall => ({
+        id: hall.id,
+        name: hall.name,
+        capacity: hall.capacity,
+        timeSlotCapacity: timeSlots.reduce((acc, time) => {
+          const bookingsForTime = hall.bookings?.filter(b => b.time_slot === time) || [];
+          acc[time] = {
+            current: bookingsForTime.length,
+            max: hall.capacity
+          };
+          return acc;
+        }, {})
+      }));
+  
+      setHalls(prev => ({
+        ...prev,
+        [selectedLocation]: formattedHalls
+      }));
+    } catch (error) {
+      console.error('Error fetching halls:', error);
+    }
+  };
+  
+  const handleBooking = async (hallId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const hall = halls[selectedLocation].find(h => h.id === hallId);
+      
+      if (!hall) {
+        throw new Error('Hall not found');
+      }
+      
+      const response = await fetch('http://127.0.0.1:8000/leads/bookings/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`, // Изменено с Token на Bearer
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          hall_id: hallId,
+          date: selectedDate.toISOString().split('T')[0],
+          time_slot: selectedTimes[hallId],
+          location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево'
+        })
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create booking');
+      }
+  
+      const data = await response.json();
+      
+      // Добавляем новую запись в локальное состояние
+      const newBooking = {
+        id: data.id,
+        location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево',
+        hall: hall.name,
+        date: selectedDate,
+        time: selectedTimes[hallId]
+      };
+      setBookings(prev => [...prev, newBooking]);
+      
+      // Сбрасываем выбранное время
+      setSelectedTimes(prev => ({ ...prev, [hallId]: null }));
+      
+      // Обновляем данные о залах
+      await fetchHalls();
+      
+      showNotification('Запись успешно создана');
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      showNotification(error.message || 'Ошибка при создании записи');
+    }
+  };
 
   const fetchUserBookings = async () => {
     try {
@@ -152,10 +256,10 @@ const StudentView = () => {
         return;
       }
   
-      const response = await fetch('http://127.0.0.1:8000/api/leads/bookings/', {
+      const response = await fetch('http://127.0.0.1:8000/leads/bookings/', {
         method: 'GET',
         headers: {
-          'Authorization': `Token ${token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -178,21 +282,30 @@ const StudentView = () => {
     }
   };
 
-  const fetchHallOccupancy = async (date, time = null) => {
+  const fetchHallOccupancy = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('Token not found');
+        window.location.href = '/login';
         return;
       }
   
-      const formattedDate = date.toISOString().split('T')[0];
+      // Проверяем, что selectedDate существует
+      if (!selectedDate) {
+        console.error('No date selected');
+        return;
+      }
+  
+      const formattedDate = selectedDate.toISOString().split('T')[0];
+      console.log('Fetching halls for date:', formattedDate);
+  
       const response = await fetch(
-        `http://127.0.0.1:8000/api/halls/?date=${formattedDate}&location=${selectedLocation}`,
+        `http://127.0.0.1:8000/leads/halls/?date=${formattedDate}&location=${selectedLocation}`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Token ${token}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         }
@@ -205,35 +318,38 @@ const StudentView = () => {
       const data = await response.json();
       console.log('Received halls data:', data);
       
-      // Обновляем только значения current в существующем defaultHalls
-      const updatedHalls = defaultHalls[selectedLocation === 'gorny' ? 'Горный' : 'Беляево'].map(hall => {
-        const serverHall = data.halls.find(h => h.name === hall.name);
-        if (serverHall) {
-          console.log(`Updating hall ${hall.name} with data:`, serverHall.timeSlotCapacity);
-          return {
-            ...hall,
-            timeSlotCapacity: {
-              ...hall.timeSlotCapacity,
-              ...Object.fromEntries(
-                Object.entries(serverHall.timeSlotCapacity).map(([time, capacity]) => [
-                  time,
-                  { current: capacity.current, max: hall.timeSlotCapacity[time].max }
-                ])
-              )
-            }
-          };
-        }
-        return hall;
-      });
-  
-      console.log('Updated halls:', updatedHalls);
-  
       setHalls(prevHalls => ({
         ...prevHalls,
-        [selectedLocation]: updatedHalls
+        [selectedLocation]: data
       }));
     } catch (error) {
       console.error('Error fetching hall occupancy:', error);
+    }
+  };
+
+  const fetchPointsHistory = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token not found');
+        return;
+      }
+  
+      const response = await fetch('http://127.0.0.1:8000/leads/points-history/', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to fetch points history');
+      }
+  
+      const data = await response.json();
+      setPointsHistory(data || []); // Устанавливаем пустой массив, если данные отсутствуют
+    } catch (error) {
+      console.error('Error fetching points history:', error);
+      setPointsHistory([]); // Устанавливаем пустой массив в случае ошибки
     }
   };
 
@@ -249,10 +365,10 @@ const StudentView = () => {
       }
   
       console.log('Fetching student profile with token:', token);
-      const response = await fetch('http://127.0.0.1:8000/api/student-data/', {
+      const response = await fetch('http://127.0.0.1:8000/leads/student-data/', {
         method: 'GET',
         headers: {
-          'Authorization': `Token ${token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -339,7 +455,7 @@ const StudentView = () => {
         </tr>
       </thead>
       <tbody>
-        {pointsHistory.map((record) => (
+      {Array.isArray(pointsHistory) && pointsHistory.map((record) => (
           <tr key={record.id}>
             <td>{record.date}</td>
             <td>{record.points}</td>
@@ -353,21 +469,50 @@ const StudentView = () => {
   </div>
 </div>
 
-  const fetchServerTime = async () => {
-    try {
-      console.log('Fetching server time...');
-      const response = await fetch('http://127.0.0.1:8000/api/server-time/');  // Изменили URL
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const data = await response.json();
-      console.log('Server response:', data);
-      return new Date(data.datetime);
-    } catch (error) {
-      console.error('Error fetching server time:', error);
-      return new Date(); // Fallback to local time if server request fails
+const fetchServerTime = async () => {
+  try {
+    console.log('Fetching server time...');
+    const response = await fetch('http://127.0.0.1:8000/leads/server-time/');
+    if (!response.ok) {
+      throw new Error('Failed to fetch server time');
     }
+    const data = await response.json();
+    console.log('Server response:', data);
+    
+    if (data.server_time) {
+      const serverDateTime = new Date(data.server_time);
+      if (!isNaN(serverDateTime.getTime())) {
+        console.log('Setting server time:', serverDateTime.toISOString());
+        setServerTime(serverDateTime);
+      } else {
+        console.error('Invalid server time format:', data.server_time);
+        setServerTime(new Date()); // Используем локальное время как запасной вариант
+      }
+    } else {
+      console.error('No server_time in response');
+      setServerTime(new Date()); // Используем локальное время как запасной вариант
+    }
+  } catch (error) {
+    console.error('Error fetching server time:', error);
+    setServerTime(new Date()); // Используем локальное время как запасной вариант
+  }
+};
+
+// Эффект для синхронизации времени
+useEffect(() => {
+  console.log('Time sync effect running');
+  const syncTime = async () => {
+    console.log('Syncing time...');
+    await fetchServerTime();
   };
+  
+  syncTime();
+  
+  // Обновляем время каждую минуту
+  const interval = setInterval(syncTime, 60000);
+  
+  return () => clearInterval(interval);
+}, []);
 
   useEffect(() => {
     if (selectedDate) {
@@ -487,35 +632,23 @@ const StudentView = () => {
   }, []);
   
   useEffect(() => {
-    // Создаем WebSocket соединение
-    const ws = new WebSocket('ws://127.0.0.1:8000/ws/bookings/');
-    
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'booking_update') {
-        // Когда приходит уведомление о новой записи, обновляем данные
-        fetchHallOccupancy(selectedDate);
-      }
-    };
-  
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-  
-    // Закрываем соединение при размонтировании компонента
-    return () => {
-      ws.close();
-    };
-  }, []); // Создаем соединение один раз при монтировании компонента
-
-  const getDayName = (date) => {
-    if (!(date instanceof Date)) return '';
-    return date.toLocaleDateString('ru-RU', { weekday: 'short' });
-  };
+    if (selectedDate) {
+      fetchHalls();
+    }
+  }, [selectedDate, selectedLocation]);
 
   const getDateString = (date) => {
-    if (!(date instanceof Date)) return '';
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'numeric' });
+    if (!date) return '';
+    const d = new Date(date);
+    return d.getDate().toString().padStart(2, '0') + '.' + 
+           (d.getMonth() + 1).toString().padStart(2, '0');
+  };
+  
+  const getDayName = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    return days[d.getDay()];
   };
 
   const handleLocationChange = (location) => {
@@ -524,10 +657,21 @@ const StudentView = () => {
   };
 
   const handleDateSelect = (date) => {
+    if (!date || isNaN(date.getTime())) {
+      console.error('Invalid date selected');
+      return;
+    }
+    
     const newDate = new Date(date);
-    newDate.setHours(0, 0, 0, 0); // Сбрасываем время для выбранной даты
+    newDate.setHours(0, 0, 0, 0);
+    
+    if (isNaN(newDate.getTime())) {
+      console.error('Invalid date after conversion');
+      return;
+    }
+    
+    console.log('Selecting new date:', newDate.toISOString());
     setSelectedDate(newDate);
-    setSelectedTimes({});
   };
 
   const handleTimeSelect = async (hallId, time) => {
@@ -555,54 +699,6 @@ const StudentView = () => {
     return selectedWeek === 1 && !isNextWeekBookingAllowed();
   };
 
-  const handleBooking = async (hallId) => {
-    try {
-      const hall = HALLS[selectedLocation].find(h => h.id === hallId);
-      const token = localStorage.getItem('token');
-      
-      // Отправляем запись на сервер
-      const response = await fetch('http://127.0.0.1:8000/api/bookings/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          hall_id: hallId,
-          date: selectedDate.toISOString().split('T')[0],
-          time_slot: selectedTimes[hallId],
-          location: selectedLocation
-        })
-      });
-  
-      if (!response.ok) {
-        throw new Error('Failed to create booking');
-      }
-  
-      const data = await response.json();
-      console.log('Booking created:', data);
-  
-      // Добавляем новую запись в локальное состояние
-      const newBooking = {
-        id: data.id,
-        location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево',
-        hall: hall.name,
-        date: selectedDate,
-        time: selectedTimes[hallId]
-      };
-      setBookings(prev => [...prev, newBooking]);
-      setSelectedTimes({ ...selectedTimes, [hallId]: null });
-      
-      // Обновляем данные о занятости
-      await fetchHallOccupancy(selectedDate);
-      
-      showNotification('Запись успешно создана');
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      showNotification('Ошибка при создании записи');
-    }
-  };
-
   const showNotification = (message) => {
     setNotification({ show: true, message });
     setTimeout(() => {
@@ -612,27 +708,37 @@ const StudentView = () => {
 
   const getNextDays = () => {
     const days = [];
-    const today = serverTime || new Date();
+    // Создаем новый объект Date для today
+    const today = serverTime ? new Date(serverTime) : new Date();
+    
+    // Убедимся, что у нас валидная дата
+    if (isNaN(today.getTime())) {
+      console.error('Invalid server time, using current time');
+      today = new Date();
+    }
+    
     today.setHours(0, 0, 0, 0);
     
-    // Получаем текущий день недели (0 - воскресенье, 1 - понедельник, ..., 6 - суббота)
+    // Вычисляем начало недели
     const currentDay = today.getDay();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
     
-    // Вычисляем начало текущей недели (понедельник)
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
-    
-    // Если выбрана следующая неделя, добавляем 7 дней к понедельнику
+    // Если выбрана следующая неделя, добавляем 7 дней
     if (selectedWeek === 1) {
-      monday.setDate(monday.getDate() + 7);
+      startDate.setDate(startDate.getDate() + 7);
     }
     
-    // Добавляем 7 дней, начиная с понедельника
+    // Добавляем дни недели
     for (let i = 0; i < 7; i++) {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + i);
-      days.push(date);
+      const nextDate = new Date(startDate);
+      nextDate.setDate(startDate.getDate() + i);
+      // Убедимся, что дата валидна
+      if (!isNaN(nextDate.getTime())) {
+        days.push(nextDate);
+      }
     }
+    
     return days;
   };
 
@@ -724,6 +830,18 @@ const StudentView = () => {
     }
   };
 
+  // Периодическое обновление данных каждые 30 секунд
+useEffect(() => {
+  const updateInterval = setInterval(() => {
+    if (selectedDate) {
+      fetchHalls();
+      fetchUserBookings();
+    }
+  }, 30000); // 30 секунд
+
+  return () => clearInterval(updateInterval);
+}, [selectedDate]);
+
   // Эффект для обновления недель при загрузке и каждую полночь
   useEffect(() => {
     updateWeeks(); // Проверяем при загрузке
@@ -764,9 +882,12 @@ const StudentView = () => {
 
   useEffect(() => {
     const init = async () => {
-      await fetchUserBookings();
-      if (selectedDate) {
-        await fetchHallOccupancy(selectedDate);
+      await fetchServerTime(); // Сначала получаем серверное время
+      await fetchStudentProfile();
+      if (selectedDate && !isNaN(selectedDate.getTime())) {
+        console.log('Selected date changed:', selectedDate.toISOString());
+        await fetchHallOccupancy();
+        await fetchUserBookings();
       }
     };
     init();
@@ -859,7 +980,7 @@ const StudentView = () => {
                 })}</div>
               </div>
               {record.comment && (
-                <div style={{ 
+                <div style={{
                   marginTop: '8px',
                   fontSize: '14px',
                   color: '#666',
@@ -921,17 +1042,31 @@ const StudentView = () => {
           </button>
           <div style={{ display: 'flex', gap: '10px' }}>
           {getNextDays().map((date, index) => {
-            const currentTime = serverTime || new Date();
-            currentTime.setHours(0, 0, 0, 0);
-            const isToday = date.getTime() === currentTime.getTime();
+            if (!date || isNaN(date.getTime())) {
+              console.error('Invalid date in getNextDays');
+              return null;
+            }
+
+            const currentTime = serverTime ? new Date(serverTime) : new Date();
+            if (isNaN(currentTime.getTime())) {
+              console.error('Invalid server time');
+              currentTime = new Date();
+            }
             
-            console.log('Date:', date.toISOString(), 'Current:', currentTime.toISOString(), 'IsToday:', isToday);
+            currentTime.setHours(0, 0, 0, 0);
+            
+            // Форматируем даты для сравнения
+            const dateStr = date.toISOString().split('T')[0];
+            const currentStr = currentTime.toISOString().split('T')[0];
+            const selectedStr = selectedDate ? selectedDate.toISOString().split('T')[0] : '';
+            
+            const isToday = dateStr === currentStr;
             
             return (
               <button
-                key={date.toISOString()}
+                key={dateStr}
                 className={`day-button ${
-                  selectedDate && date.getTime() === selectedDate.getTime() ? 'selected' : ''
+                  selectedStr && dateStr === selectedStr ? 'selected' : ''
                 } ${isToday ? 'today' : ''}`}
                 onClick={() => handleDateSelect(date)}
               >
@@ -959,7 +1094,7 @@ const StudentView = () => {
 
         <div className="content-layout">
           <div className="halls-section" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '10px' }}>
-            {HALLS[selectedLocation].map(hall => (
+            {halls[selectedLocation].map(hall => (
               <div key={hall.id} className="hall-card">
                 <img src={hall.image || '/placeholder-hall.jpg'} alt={hall.name} className="hall-image" />
                 <div className="hall-info">

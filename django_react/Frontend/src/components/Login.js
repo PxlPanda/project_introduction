@@ -168,7 +168,7 @@ function Login({ onLogin }) {
         }
       }
       
-      const loginResponse = await fetch('/api/login/', {
+      const loginResponse = await fetch('/leads/token/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -189,8 +189,9 @@ function Login({ onLogin }) {
       }
   
       // Сохраняем токен и данные пользователя
-      localStorage.setItem('token', loginData.token);
-      localStorage.setItem('userType', loginData.user_type);
+      localStorage.setItem('token', loginData.access);
+      localStorage.setItem('refreshToken', loginData.refresh);
+      localStorage.setItem('userType', isStudent ? 'student' : 'teacher');
       localStorage.setItem('userData', JSON.stringify({
         type: loginData.user_type,
         name: loginData.full_name,

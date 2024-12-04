@@ -7,5 +7,3 @@ Pillow==10.1.0  # для работы с изображениями
 django-environ==0.11.2
 whitenoise==6.6.0  # для раздачи статических файлов
 gunicorn==21.2.0  # для production сервера
-channels==4.0.0
-channels-redis==4.1.0

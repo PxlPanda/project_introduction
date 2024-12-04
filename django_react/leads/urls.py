@@ -19,4 +19,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('users/me/', views.current_user, name='current-user'),
     path('bookings/', booking_view, name='booking_view'),
+    path('student-data/', views.student_data, name='student-data'), 
+    path('server-time/', views.server_time, name='server-time'),    
+
 ]

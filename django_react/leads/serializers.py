@@ -21,10 +21,10 @@ class TeacherSerializer(serializers.ModelSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email')
     full_name = serializers.CharField(source='user.full_name')
-
+    
     class Meta:
         model = Student
-        fields = ['id', 'email', 'full_name', 'group_name', 'student_number', 'points']
+        fields = ['id', 'email', 'full_name', 'student_number', 'group_name', 'points']
 
 class LocationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -33,18 +33,40 @@ class LocationSerializer(serializers.ModelSerializer):
 
 class HallSerializer(serializers.ModelSerializer):
     location_name = serializers.CharField(source='location.name', read_only=True)
-    current_bookings_count = serializers.SerializerMethodField()
+    timeSlotCapacity = serializers.SerializerMethodField()
 
     class Meta:
         model = Hall
-        fields = ['id', 'name', 'location', 'location_name', 'capacity', 'is_active', 'current_bookings_count']
+        fields = ['id', 'name', 'location', 'location_name', 'capacity', 'is_active', 'timeSlotCapacity']
 
-    def get_current_bookings_count(self, obj):
+    def get_timeSlotCapacity(self, obj):
         date = self.context.get('date')
-        time_slot = self.context.get('time_slot')
-        if date and time_slot:
-            return obj.bookings.filter(date=date, time_slot=time_slot).count()
-        return None
+        if not date:
+            return {}
+
+        # Стандартные временные слоты
+        time_slots = {
+            '10:00': {'current': 0, 'max': obj.capacity},
+            '12:00': {'current': 0, 'max': obj.capacity},
+            '14:00': {'current': 0, 'max': obj.capacity},
+            '16:00': {'current': 0, 'max': obj.capacity},
+            '18:00': {'current': 0, 'max': obj.capacity}
+        }
+
+        try:
+            # Получаем количество бронирований для каждого временного слота
+            for time_slot in time_slots.keys():
+                bookings_count = obj.bookings.filter(
+                    date=date,
+                    time_slot=time_slot
+                ).count()
+                time_slots[time_slot]['current'] = bookings_count
+        except Exception as e:
+            print(f"Error counting bookings: {str(e)}")
+            # В случае ошибки возвращаем пустые слоты
+            return time_slots
+
+        return time_slots
 
 class PinnedHallSerializer(serializers.ModelSerializer):
     hall_details = HallSerializer(source='hall', read_only=True)

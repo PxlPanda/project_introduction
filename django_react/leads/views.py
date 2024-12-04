@@ -3,7 +3,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, Teacher, Student
@@ -63,45 +63,15 @@ class HallViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         location = self.request.query_params.get('location', None)
-        capacity_status = self.request.query_params.get('capacity_status', None)
         
         if location:
             queryset = queryset.filter(location__name=location)
-
-        if capacity_status:
-            date = self.request.query_params.get('date')
-            time_slot = self.request.query_params.get('time_slot')
-            
-            if date and time_slot:
-                halls_with_bookings = queryset.annotate(
-                    booking_count=Count('bookings', 
-                        filter=models.Q(
-                            bookings__date=date,
-                            bookings__time_slot=time_slot
-                        )
-                    )
-                )
-                
-                if capacity_status == 'green':
-                    queryset = halls_with_bookings.filter(
-                        booking_count__lt=models.F('capacity') * 0.5
-                    )
-                elif capacity_status == 'yellow':
-                    queryset = halls_with_bookings.filter(
-                        booking_count__gte=models.F('capacity') * 0.5,
-                        booking_count__lt=models.F('capacity')
-                    )
-                elif capacity_status == 'full':
-                    queryset = halls_with_bookings.filter(
-                        booking_count=models.F('capacity')
-                    )
 
         return queryset
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['date'] = self.request.query_params.get('date')
-        context['time_slot'] = self.request.query_params.get('time_slot')
         return context
 
 class PinnedHallViewSet(viewsets.ModelViewSet):
@@ -208,7 +178,7 @@ class PointsHistoryViewSet(viewsets.ReadOnlyModelViewSet):
             return PointsHistory.objects.filter(student__user=user)
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([IsAuthenticated])
 def current_user(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
@@ -289,3 +259,28 @@ def get_teachers(request):
     teachers = Teacher.objects.all()
     serializer = TeacherSerializer(teachers, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_data(request):
+    """
+    Получение данных студента
+    """
+    try:
+        student = Student.objects.get(user=request.user)
+        serializer = StudentSerializer(student)
+        return Response(serializer.data)
+    except Student.DoesNotExist:
+        return Response(
+            {'error': 'Student profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+@api_view(['GET'])
+def server_time(request):
+    """
+    Получение текущего времени сервера
+    """
+    return Response({
+        'server_time': timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    })

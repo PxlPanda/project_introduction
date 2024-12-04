@@ -16,7 +16,7 @@ urlpatterns = [
     path('api/halls/', views.get_halls, name='get_halls'),
     
     # Leads app URLs
-    path('api/leads/', include('leads.urls')),
+    path('leads/', include('leads.urls')),
     
     # Static files
     path('manifest.json', serve, {'document_root': settings.REACT_APP_DIR, 'path': 'public/manifest.json'}),
