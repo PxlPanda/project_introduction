@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../styles/base.css';
 import '../styles/navigation.css';
 import '../styles/hall-card.css';
@@ -115,43 +115,6 @@ const getLessonNumber = (time, location) => {
 };
 
 // Функция для проверки конфликта времени
-const checkTimeConflict = (booking, selectedTime, selectedDate, selectedLocation) => {
-  console.log('Checking conflict for:', {
-    booking,
-    selectedTime,
-    selectedDate: selectedDate.toISOString(),
-    selectedLocation
-  });
-
-  // Проверяем совпадение даты
-  const bookingDate = new Date(booking.date);
-  const selectedDateStr = selectedDate.toISOString().split('T')[0];
-  const bookingDateStr = bookingDate.toISOString().split('T')[0];
-  
-  console.log('Comparing dates:', {
-    bookingDate: bookingDateStr,
-    selectedDate: selectedDateStr
-  });
-
-  if (selectedDateStr !== bookingDateStr) {
-    console.log('Dates do not match');
-    return false;
-  }
-
-  // Определяем номер пары для текущего слота
-  const currentLessonNumber = getLessonNumber(selectedTime, selectedLocation);
-  
-  // Определяем номер пары для существующей брони
-  const bookingLocation = booking.location.toLowerCase() === 'горный' ? 'gorny' : 'belyaevo';
-  const bookingLessonNumber = getLessonNumber(booking.time, bookingLocation);
-  
-  console.log('Comparing lesson numbers:', {
-    currentLessonNumber,
-    bookingLessonNumber
-  });
-
-  return currentLessonNumber === bookingLessonNumber;
-};
 
 const StudentView = () => {
   console.log('StudentView rendering');  // Добавьте эту строку в начало компонента
@@ -181,6 +144,7 @@ const StudentView = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
   const prevDateRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [halls, setHalls] = useState({
     gorny: [],
     belyaevo: []
@@ -216,27 +180,79 @@ const StudentView = () => {
     return days;
   }, [selectedWeek, serverTime]);
   
+  const checkTimeConflict = useCallback((time) => {
+    if (!bookings.length) return false;
+  
+    return bookings.some(booking => {
+      // Проверяем совпадение даты
+      const bookingDate = booking.date;
+      const compareDate = selectedDate;
+      
+      const isSameDate = 
+        bookingDate.getFullYear() === compareDate.getFullYear() &&
+        bookingDate.getMonth() === compareDate.getMonth() &&
+        bookingDate.getDate() === compareDate.getDate();
+  
+      if (!isSameDate) {
+        return false;
+      }
+  
+      // Получаем номера пар и сравниваем их
+      const currentLessonNumber = getLessonNumber(time, selectedLocation);
+      const bookingLocation = booking.location.toLowerCase() === 'горный' ? 'gorny' : 'belyaevo';
+      const bookingLessonNumber = getLessonNumber(booking.time, bookingLocation);
+  
+      // Теперь просто сравниваем номера пар, игнорируя локацию
+      return currentLessonNumber === bookingLessonNumber;
+    });
+  }, [bookings, selectedDate, selectedLocation]);
+
   useEffect(() => {
     const initializeComponent = async () => {
-      // Проверка авторизации
-      const savedUserData = localStorage.getItem('userData');
-      if (!savedUserData) {
-        window.location.href = '/login';
-        return;
+      setIsLoading(true);
+      try {
+        const savedUserData = localStorage.getItem('userData');
+        if (!savedUserData) {
+          window.location.href = '/login';
+          return;
+        }
+        
+        setUserData(JSON.parse(savedUserData));
+        
+        // Загружаем все данные параллельно
+        await Promise.all([
+          fetchStudentProfile(),
+          fetchServerTime(),
+          fetchBookings(),
+          fetchHalls()
+        ]);
+      } catch (error) {
+        console.error('Error initializing component:', error);
+      } finally {
+        setIsLoading(false);
       }
-      
-      // Инициализация всех данных
-      setUserData(JSON.parse(savedUserData));
-      await fetchStudentProfile();
-      await fetchServerTime();
     };
     
     initializeComponent();
     
-    // Интервал для обновления времени
     const timeInterval = setInterval(fetchServerTime, 60000);
     return () => clearInterval(timeInterval);
-  }, []); // Пустой массив зависимостей - выполнится только при монтировании
+  }, []);
+
+  useEffect(() => {
+    if (selectedDate && selectedLocation) {
+      const loadData = async () => {
+        setIsLoading(true);
+        try {
+          await Promise.all([fetchHalls(), fetchBookings()]);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadData();
+    }
+  }, [selectedDate, selectedLocation]);
+
   const fetchHalls = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -291,11 +307,34 @@ const StudentView = () => {
     }
   };
   
+  const gornyTimeSlots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
+  const belyaevoTimeSlots = ['8:30', '10:10', '11:50', '13:30'];
+
+  const normalizeTime = (time) => {
+    return time.trim().replace(/^(\d):/, '0$1:');
+  };
+
   const getLessonNumber = (time, location) => {
-    const gornyTimes = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
-    const belyaevoTimes = ['8:30', '10:10', '11:50', '13:30'];
-    const times = location === 'gorny' ? gornyTimes : belyaevoTimes;
-    return times.indexOf(time) + 1;
+    // Создадим маппинг времени на номера пар для обоих корпусов
+    const lessonMap = {
+      gorny: {
+        '9:00': 1,
+        '10:50': 2,
+        '12:40': 3,
+        '14:30': 4,
+        '16:30': 5,
+        '18:20': 6
+      },
+      belyaevo: {
+        '8:30': 1,
+        '10:10': 2,
+        '11:50': 3,
+        '13:30': 4
+      }
+    };
+  
+    const normalizedTime = normalizeTime(time);
+    return lessonMap[location][normalizedTime] || 0;
   };
 
   const handleBooking = async (hallId) => {
@@ -307,6 +346,10 @@ const StudentView = () => {
         throw new Error('Hall not found');
       }
       
+      const bookingDate = new Date(selectedDate);
+      const dateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
+      bookingDate.setUTCHours(0, 0, 0, 0);
+      
       const response = await fetch('http://127.0.0.1:8000/leads/bookings/', {
         method: 'POST',
         headers: {
@@ -315,49 +358,21 @@ const StudentView = () => {
         },
         body: JSON.stringify({
           hall_id: hallId,
-          date: selectedDate.toISOString().split('T')[0],
+          date: dateStr,
           time_slot: selectedTimes[hallId],
           location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево'
         })
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to create booking');
       }
-  
-      const data = await response.json();
+
+      // После успешного создания записи обновляем данные
+      await Promise.all([fetchBookings(), fetchHalls()]);
       
-      // Обновляем локальное состояние
-      const newBooking = {
-        id: data.id,
-        location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево',
-        hall: hall.name,
-        date: selectedDate,
-        time: selectedTimes[hallId]
-      };
-      
-      setBookings(prev => [...prev, newBooking]);
-      
-      // Обновляем состояние залов локально
-      setHalls(prev => {
-        const updatedHalls = prev[selectedLocation].map(h => {
-          if (h.id === hallId) {
-            const updatedTimeSlots = { ...h.timeSlotCapacity };
-            const selectedTime = selectedTimes[hallId];
-            if (updatedTimeSlots[selectedTime]) {
-              updatedTimeSlots[selectedTime].current += 1;
-            }
-            return { ...h, timeSlotCapacity: updatedTimeSlots };
-          }
-          return h;
-        });
-        return { ...prev, [selectedLocation]: updatedHalls };
-      });
-      
-      // Сбрасываем выбранное время
       setSelectedTimes(prev => ({ ...prev, [hallId]: null }));
-      
       showNotification('Запись успешно создана');
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -439,12 +454,15 @@ const StudentView = () => {
       }
   
       const formattedBookings = data.bookings.map(booking => {
-        console.log('Processing booking:', booking);
+        // Создаем дату в локальной временной зоне
+        const [year, month, day] = booking.date.split('-').map(Number);
+        const date = new Date(year, month - 1, day, 12); // добавляем 12 часов, чтобы избежать проблем с часовым поясом
+        
         return {
           id: booking.id,
           hall: booking.hall.name,
           location: booking.location,
-          date: new Date(booking.date), // Преобразуем в объект Date
+          date: date,
           time: booking.time_slot
         };
       });
@@ -1160,9 +1178,7 @@ useEffect(() => {
                           new Date(booking.date).getTime() === selectedDate.getTime() &&
                           booking.location === (selectedLocation === 'gorny' ? 'Горный' : 'Беляево')
                       );
-                      const timeConflict = bookings.some(booking => 
-                        checkTimeConflict(booking, time, selectedDate, selectedLocation)
-                      );
+                      const timeConflict = checkTimeConflict(time);
                       const isFull = timeCapacity.current >= timeCapacity.max;
                       const isPast = isPastDate(selectedDate);
                       
