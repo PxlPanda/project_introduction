@@ -353,3 +353,32 @@ body, html {
 .award-points-button:hover {
   background-color: #1565c0;
 }
+
+.student-profile {
+  padding: 20px;
+  background-color: var(--color-white);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+.student-profile h2 {
+  color: var(--color-text);
+  margin-bottom: 15px;
+}
+
+.student-profile .info-row {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.student-profile .info-label {
+  font-weight: 600;
+  min-width: 150px;
+  color: var(--color-gray-700);
+}
+
+.student-profile .info-value {
+  color: var(--color-gray-800);
+}

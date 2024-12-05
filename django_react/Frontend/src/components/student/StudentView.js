@@ -118,12 +118,6 @@ const getLessonNumber = (time, location) => {
 
 const StudentView = () => {
   console.log('StudentView rendering');  // Добавьте эту строку в начало компонента
-
-  const [studentProfile, setStudentProfile] = useState({
-    fullName: '',
-    group: '',
-    studentId: ''
-  });
   
   const [pointsHistory, setPointsHistory] = useState([]);  // Для истории баллов
   const [currentPoints, setCurrentPoints] = useState(0);  // Для текущих баллов
@@ -145,6 +139,9 @@ const StudentView = () => {
   const searchInputRef = useRef(null);
   const prevDateRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [studentGroup, setStudentGroup] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [studentName, setStudentName] = useState(''); 
   const [halls, setHalls] = useState({
     gorny: [],
     belyaevo: []
@@ -207,6 +204,7 @@ const StudentView = () => {
     });
   }, [bookings, selectedDate, selectedLocation]);
 
+  
   useEffect(() => {
     const initializeComponent = async () => {
       setIsLoading(true);
@@ -534,7 +532,6 @@ const StudentView = () => {
 
   // Функция fetchStudentProfile
   const fetchStudentProfile = async () => {
-    
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -564,23 +561,19 @@ const StudentView = () => {
       }
   
       const data = await response.json();
-      console.log('Received student data:', data);
-      
-      
-      setStudentProfile({
-        fullName: data.full_name,
-        group: data.group,
-        studentId: data.student_id
-      });
+      console.log('Received student data:', data);  // Смотрим, что приходит
 
-      const profileData = {
-        fullName: data.full_name,
-        group: data.group,
-        studentId: data.student_id
-      };
-      console.log('Setting profile data:', profileData);
-      setStudentProfile(profileData);
-
+      // Добавим больше логов для отладки
+      console.log('Setting student name:', data.full_name);
+      console.log('Setting student group:', data.group);
+      console.log('Setting student id:', data.student_id);
+  
+      // Устанавливаем данные в отдельные состояния
+      setStudentName(data.full_name || 'Не указано');
+      setStudentGroup(data.group_name || 'Не указана');
+      setStudentId(data.student_number|| 'Не указан');
+  
+      // Устанавливаем историю баллов и текущие баллы
       setPointsHistory(data.points_history?.map(record => ({
         id: record.id,
         date: new Date(record.date).toLocaleString(),
@@ -592,61 +585,14 @@ const StudentView = () => {
       setCurrentPoints(data.current_points || 0);
     } catch (error) {
       console.error('Error fetching student data:', error);
-      setStudentProfile({
-        fullName: 'Не указано',
-        group: 'Не указана',
-        studentId: 'Не указан'
-      });
+      // В случае ошибки устанавливаем значения по умолчанию
+      setStudentName('Не указано');
+      setStudentGroup('Не указана');
+      setStudentId('Не указан');
       setPointsHistory([]);
       setCurrentPoints(0);
     }
   };
-
-// JSX для отображения профиля (вставьте в return компонента)
-<div className="student-profile" style={{
-  padding: '20px',
-  backgroundColor: '#fff',
-  borderRadius: '8px',
-  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  marginBottom: '20px'
-}}>
-  <h2 style={{ color: '#333', marginBottom: '15px' }}>Профиль студента</h2>
-  <div style={{ marginBottom: '10px' }}>
-    <strong>ФИО:</strong> {studentProfile?.fullName || 'Не указано'}
-  </div>
-  <div style={{ marginBottom: '10px' }}>
-    <strong>Группа:</strong> {studentProfile?.group || 'Не указана'}
-  </div>
-  <div style={{ marginBottom: '10px' }}>
-    <strong>Номер студенческого:</strong> {studentProfile?.studentId || 'Не указан'}
-  </div>
-
-  <div className="points-history-section">
-    <h3>История баллов</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Дата</th>
-          <th>Баллы</th>
-          <th>Причина</th>
-          <th>Тип</th>
-          <th>Кем начислено</th>
-        </tr>
-      </thead>
-      <tbody>
-      {Array.isArray(pointsHistory) && pointsHistory.map((record) => (
-          <tr key={record.id}>
-            <td>{record.date}</td>
-            <td>{record.points}</td>
-            <td>{record.reason}</td>
-            <td>{record.type}</td>
-            <td>{record.awardedBy || 'Система'}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</div>
 
 const fetchServerTime = async () => {
   try {
@@ -1060,6 +1006,7 @@ useEffect(() => {
   );
 
   return (
+    
     <div className="mobile-container">
       <header className="app-header">
         <h1 className="app-title">спорт <span className="misis-text">МИСИС</span></h1>
@@ -1069,6 +1016,50 @@ useEffect(() => {
           window.location.href = '/login';
         }}>Выйти</button>
       </header>
+      
+      {/* Блок профиля студента */}
+    <div className="student-profile">
+      <h2>Профиль студента</h2>
+      <div className="info-row">
+        <span className="info-label">ФИО:</span>
+        <span className="info-value">{studentName}</span>
+      </div>
+      <div className="info-row">
+        <span className="info-label">Группа:</span>
+        <span className="info-value">{studentGroup}</span>
+      </div>
+      <div className="info-row">
+        <span className="info-label">Номер студенческого:</span>
+        <span className="info-value">{studentId}</span>
+      </div>
+
+      {/* История баллов */}
+      <div className="points-history-section">
+        <h3>История баллов</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Баллы</th>
+              <th>Причина</th>
+              <th>Тип</th>
+              <th>Кем начислено</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.isArray(pointsHistory) && pointsHistory.map((record) => (
+              <tr key={record.id}>
+                <td>{record.date}</td>
+                <td>{record.points}</td>
+                <td>{record.reason}</td>
+                <td>{record.type}</td>
+                <td>{record.awardedBy || 'Система'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
 
       <div className="navigation-container">
         <div className="top-section">
@@ -1298,13 +1289,13 @@ useEffect(() => {
               <div className="profile-header">
                 <div className="profile-info">
                   <div className="profile-name" style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px', color: '#333' }}>
-                    {studentProfile?.fullName || 'ФИО не указано'}
+                    {studentName || 'ФИО не указано'}
                   </div>
                   <div className="profile-group" style={{ fontSize: '14px', marginBottom: '4px', color: '#555' }}>
-                    Группа: {studentProfile?.group || 'Не указана'}
+                    Группа: {studentGroup || 'Не указана'}
                   </div>
                   <div className="profile-student-id" style={{ fontSize: '14px', color: '#555' }}>
-                    Студ. билет: {studentProfile?.studentId || 'Не указан'}
+                    Студ. билет: {studentId || 'Не указан'}
                   </div>
                 </div>
               </div>
