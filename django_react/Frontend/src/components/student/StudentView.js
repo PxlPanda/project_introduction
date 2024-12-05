@@ -185,6 +185,58 @@ const StudentView = () => {
     gorny: [],
     belyaevo: []
   });
+
+  const getNextDays = React.useCallback(() => {
+    const days = [];
+    const today = serverTime ? new Date(serverTime) : new Date();
+    
+    if (isNaN(today.getTime())) {
+      console.error('Invalid server time, using current time');
+      today = new Date();
+    }
+    
+    today.setHours(0, 0, 0, 0);
+    
+    const currentDay = today.getDay();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
+    
+    if (selectedWeek === 1) {
+      startDate.setDate(startDate.getDate() + 7);
+    }
+    
+    for (let i = 0; i < 7; i++) {
+      const nextDate = new Date(startDate);
+      nextDate.setDate(startDate.getDate() + i);
+      if (!isNaN(nextDate.getTime())) {
+        days.push(nextDate);
+      }
+    }
+    
+    return days;
+  }, [selectedWeek, serverTime]);
+  
+  useEffect(() => {
+    const initializeComponent = async () => {
+      // Проверка авторизации
+      const savedUserData = localStorage.getItem('userData');
+      if (!savedUserData) {
+        window.location.href = '/login';
+        return;
+      }
+      
+      // Инициализация всех данных
+      setUserData(JSON.parse(savedUserData));
+      await fetchStudentProfile();
+      await fetchServerTime();
+    };
+    
+    initializeComponent();
+    
+    // Интервал для обновления времени
+    const timeInterval = setInterval(fetchServerTime, 60000);
+    return () => clearInterval(timeInterval);
+  }, []); // Пустой массив зависимостей - выполнится только при монтировании
   const fetchHalls = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -242,7 +294,6 @@ const StudentView = () => {
   const getLessonNumber = (time, location) => {
     const gornyTimes = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
     const belyaevoTimes = ['8:30', '10:10', '11:50', '13:30'];
-    
     const times = location === 'gorny' ? gornyTimes : belyaevoTimes;
     return times.indexOf(time) + 1;
   };
@@ -608,63 +659,22 @@ const fetchServerTime = async () => {
   }
 };
 
-// Эффект для синхронизации времени
-useEffect(() => {
-  console.log('Time sync effect running');
-  const syncTime = async () => {
-    console.log('Syncing time...');
-    await fetchServerTime();
-  };
-  
-  syncTime();
-  
-  // Обновляем время каждую минуту
-  const interval = setInterval(syncTime, 60000);
-  
-  return () => clearInterval(interval);
-}, []);
-
 useEffect(() => {
   const loadHalls = async () => {
     if (selectedDate && selectedLocation) {
       const currentDate = selectedDate.toISOString().split('T')[0];
-      if (currentDate !== prevDateRef.current) {
-        prevDateRef.current = currentDate;
+      const locationKey = `${selectedLocation}-${currentDate}`;
+      
+      if (locationKey !== prevDateRef.current) {
+        prevDateRef.current = locationKey;
         await fetchHalls();
+        await fetchBookings(); // Добавим и обновление записей
       }
     }
   };
+  
   loadHalls();
 }, [selectedDate, selectedLocation]);
-
-
-  useEffect(() => {
-    if (userData) {
-      fetchStudentProfile();
-    }
-  }, [userData]);
-
-  useEffect(() => {
-    fetchStudentProfile();
-  }, []);
-
-  useEffect(() => {
-    console.log('studentProfile changed:', studentProfile);
-  }, [studentProfile]);
-
-  useEffect(() => {
-    console.log('Server Time:', serverTime);
-  }, [serverTime]);
-
-  useEffect(() => {
-    const savedUserData = localStorage.getItem('userData');
-    if (!savedUserData) {
-      window.location.href = '/login';
-      return;
-    }
-    setUserData(JSON.parse(savedUserData));
-  }, []);
-
 
   useEffect(() => {
     if (showHistory && searchInputRef.current) {
@@ -788,42 +798,6 @@ useEffect(() => {
     setTimeout(() => {
       setNotification({ show: false, message: '' });
     }, 3000);
-  };
-
-  const getNextDays = () => {
-    const days = [];
-    // Создаем новый объект Date для today
-    const today = serverTime ? new Date(serverTime) : new Date();
-    
-    // Убедимся, что у нас валидная дата
-    if (isNaN(today.getTime())) {
-      console.error('Invalid server time, using current time');
-      today = new Date();
-    }
-    
-    today.setHours(0, 0, 0, 0);
-    
-    // Вычисляем начало недели
-    const currentDay = today.getDay();
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1));
-    
-    // Если выбрана следующая неделя, добавляем 7 дней
-    if (selectedWeek === 1) {
-      startDate.setDate(startDate.getDate() + 7);
-    }
-    
-    // Добавляем дни недели
-    for (let i = 0; i < 7; i++) {
-      const nextDate = new Date(startDate);
-      nextDate.setDate(startDate.getDate() + i);
-      // Убедимся, что дата валидна
-      if (!isNaN(nextDate.getTime())) {
-        days.push(nextDate);
-      }
-    }
-    
-    return days;
   };
 
   const isNextWeekBookingAllowed = () => {
@@ -952,42 +926,17 @@ useEffect(() => {
   useEffect(() => {
     const days = getNextDays();
     if (days.length > 0) {
-      setSelectedDate(days[0]);
-      setSelectedTimes({});
+      // Проверяем, действительно ли дата изменилась
+      const newDate = days[0];
+      if (!selectedDate || 
+          newDate.getDate() !== selectedDate.getDate() || 
+          newDate.getMonth() !== selectedDate.getMonth() || 
+          newDate.getFullYear() !== selectedDate.getFullYear()) {
+        setSelectedDate(newDate);
+        setSelectedTimes({});
+      }
     }
   }, [selectedWeek]);
-
-  useEffect(() => {
-    if (selectedDate && !isNaN(selectedDate.getTime())) {
-      fetchHalls();
-      fetchBookings();
-    }
-  }, [selectedDate, selectedLocation]);
-  
-  useEffect(() => {
-    const timeInterval = setInterval(fetchServerTime, 60000);
-    return () => clearInterval(timeInterval);
-  }, []);
-
-  useEffect(() => {
-    const init = async () => {
-      await fetchServerTime();
-      await fetchStudentProfile();
-    };
-    init();
-  }, []);
-
-  
-// useEffect(() => {
-//   const checkConflicts = () => {
-//     if (!selectedDate || !bookings.length) return;
-    
-//     // Форсируем перерисовку компонента
-//     setSelectedLocation(loc => loc === 'gorny' ? 'gorny' : 'belyaevo');
-//   };
-  
-//   checkConflicts();
-// }, [bookings, selectedDate]);
 
   // Компонент модального окна истории
   const HistoryModal = () => (
