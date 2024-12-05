@@ -104,9 +104,53 @@ const HALLS = {
 };
 
 // Временные слоты
-const timeSlots = {
+const TIME_SLOTS = {
   gorny: ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'],
   belyaevo: ['8:30', '10:10', '11:50', '13:30']
+};
+
+const getLessonNumber = (time, location) => {
+  const slots = TIME_SLOTS[location.toLowerCase()];
+  return slots ? slots.indexOf(time) + 1 : 0;
+};
+
+// Функция для проверки конфликта времени
+const checkTimeConflict = (booking, selectedTime, selectedDate, selectedLocation) => {
+  console.log('Checking conflict for:', {
+    booking,
+    selectedTime,
+    selectedDate: selectedDate.toISOString(),
+    selectedLocation
+  });
+
+  // Проверяем совпадение даты
+  const bookingDate = new Date(booking.date);
+  const selectedDateStr = selectedDate.toISOString().split('T')[0];
+  const bookingDateStr = bookingDate.toISOString().split('T')[0];
+  
+  console.log('Comparing dates:', {
+    bookingDate: bookingDateStr,
+    selectedDate: selectedDateStr
+  });
+
+  if (selectedDateStr !== bookingDateStr) {
+    console.log('Dates do not match');
+    return false;
+  }
+
+  // Определяем номер пары для текущего слота
+  const currentLessonNumber = getLessonNumber(selectedTime, selectedLocation);
+  
+  // Определяем номер пары для существующей брони
+  const bookingLocation = booking.location.toLowerCase() === 'горный' ? 'gorny' : 'belyaevo';
+  const bookingLessonNumber = getLessonNumber(booking.time, bookingLocation);
+  
+  console.log('Comparing lesson numbers:', {
+    currentLessonNumber,
+    bookingLessonNumber
+  });
+
+  return currentLessonNumber === bookingLessonNumber;
 };
 
 const StudentView = () => {
@@ -175,7 +219,7 @@ const StudentView = () => {
         id: hall.id,
         name: hall.name,
         capacity: hall.capacity,
-        timeSlotCapacity: timeSlots[selectedLocation].reduce((acc, time) => {
+        timeSlotCapacity: TIME_SLOTS[selectedLocation].reduce((acc, time) => {
           const bookingsForTime = hall.bookings?.filter(b => b.time_slot === time) || [];
           acc[time] = {
             current: bookingsForTime.length,
@@ -195,6 +239,14 @@ const StudentView = () => {
     }
   };
   
+  const getLessonNumber = (time, location) => {
+    const gornyTimes = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
+    const belyaevoTimes = ['8:30', '10:10', '11:50', '13:30'];
+    
+    const times = location === 'gorny' ? gornyTimes : belyaevoTimes;
+    return times.indexOf(time) + 1;
+  };
+
   const handleBooking = async (hallId) => {
     try {
       const token = localStorage.getItem('token');
@@ -207,7 +259,7 @@ const StudentView = () => {
       const response = await fetch('http://127.0.0.1:8000/leads/bookings/', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`, // Изменено с Token на Bearer
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -225,7 +277,7 @@ const StudentView = () => {
   
       const data = await response.json();
       
-      // Добавляем новую запись в локальное состояние
+      // Обновляем локальное состояние
       const newBooking = {
         id: data.id,
         location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево',
@@ -233,52 +285,32 @@ const StudentView = () => {
         date: selectedDate,
         time: selectedTimes[hallId]
       };
+      
       setBookings(prev => [...prev, newBooking]);
+      
+      // Обновляем состояние залов локально
+      setHalls(prev => {
+        const updatedHalls = prev[selectedLocation].map(h => {
+          if (h.id === hallId) {
+            const updatedTimeSlots = { ...h.timeSlotCapacity };
+            const selectedTime = selectedTimes[hallId];
+            if (updatedTimeSlots[selectedTime]) {
+              updatedTimeSlots[selectedTime].current += 1;
+            }
+            return { ...h, timeSlotCapacity: updatedTimeSlots };
+          }
+          return h;
+        });
+        return { ...prev, [selectedLocation]: updatedHalls };
+      });
       
       // Сбрасываем выбранное время
       setSelectedTimes(prev => ({ ...prev, [hallId]: null }));
       
-      // Обновляем данные о залах
-      await fetchHalls();
       showNotification('Запись успешно создана');
-
     } catch (error) {
       console.error('Error creating booking:', error);
       showNotification(error.message || 'Ошибка при создании записи');
-    }
-  };
-
-  const fetchUserBookings = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('Token not found');
-        return;
-      }
-  
-      const response = await fetch('http://127.0.0.1:8000/leads/bookings/', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-  
-      if (!response.ok) {
-        throw new Error('Failed to fetch user bookings');
-      }
-  
-      const data = await response.json();
-      console.log('Received user bookings:', data);
-      setBookings(data.bookings.map(booking => ({
-        id: booking.id,
-        location: booking.location,
-        hall: booking.hall.name,
-        date: new Date(booking.date),
-        time: booking.time_slot
-      })));
-    } catch (error) {
-      console.error('Error fetching user bookings:', error);
     }
   };
 
@@ -327,29 +359,107 @@ const StudentView = () => {
     }
   };
 
-  const fetchPointsHistory = async () => {
+  const fetchBookings = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('Token not found');
-        return;
+        throw new Error('Не найден токен авторизации');
       }
   
-      const response = await fetch('http://127.0.0.1:8000/leads/points-history/', {
+      console.log('Fetching bookings...');
+      const response = await fetch('http://127.0.0.1:8000/leads/bookings/', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
   
       if (!response.ok) {
-        throw new Error('Failed to fetch points history');
+        throw new Error('Ошибка при загрузке бронирований');
       }
   
       const data = await response.json();
-      setPointsHistory(data || []); // Устанавливаем пустой массив, если данные отсутствуют
+      console.log('Raw bookings response:', data);
+  
+      if (!data.bookings) {
+        console.error('Unexpected bookings data structure:', data);
+        setBookings([]);
+        return;
+      }
+  
+      const formattedBookings = data.bookings.map(booking => {
+        console.log('Processing booking:', booking);
+        return {
+          id: booking.id,
+          hall: booking.hall.name,
+          location: booking.location,
+          date: new Date(booking.date), // Преобразуем в объект Date
+          time: booking.time_slot
+        };
+      });
+      
+      console.log('Formatted bookings:', formattedBookings);
+      setBookings(formattedBookings);
     } catch (error) {
-      console.error('Error fetching points history:', error);
-      setPointsHistory([]); // Устанавливаем пустой массив в случае ошибки
+      console.error('Error fetching bookings:', error);
+      setBookings([]);
+      setNotification({
+        show: true,
+        message: error.message || 'Ошибка при загрузке бронирований'
+      });
+    }
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Не найден токен авторизации');
+      }
+  
+      const response = await fetch(`/leads/bookings/${bookingId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+  
+      if (!response.ok) {
+        throw new Error('Ошибка при отмене записи');
+      }
+      
+      // Обновляем локальное состояние
+      const canceledBooking = bookings.find(b => b.id === bookingId);
+      if (canceledBooking) {
+        setHalls(prev => {
+          const location = canceledBooking.location === 'Горный' ? 'gorny' : 'belyaevo';
+          const updatedHalls = prev[location].map(hall => {
+            if (hall.name === canceledBooking.hall) {
+              const updatedTimeSlots = { ...hall.timeSlotCapacity };
+              if (updatedTimeSlots[canceledBooking.time]) {
+                updatedTimeSlots[canceledBooking.time].current -= 1;
+              }
+              return { ...hall, timeSlotCapacity: updatedTimeSlots };
+            }
+            return hall;
+          });
+          return { ...prev, [location]: updatedHalls };
+        });
+      }
+      
+      setBookings(prev => prev.filter(b => b.id !== bookingId));
+      
+      setNotification({
+        show: true,
+        message: 'Запись успешно отменена'
+      });
+    } catch (error) {
+      console.error('Error canceling booking:', error);
+      setNotification({
+        show: true,
+        message: error.message || 'Ошибка при отмене записи'
+      });
     }
   };
 
@@ -518,7 +628,6 @@ useEffect(() => {
   const loadHalls = async () => {
     if (selectedDate && selectedLocation) {
       const currentDate = selectedDate.toISOString().split('T')[0];
-      // Проверяем, действительно ли изменилась дата
       if (currentDate !== prevDateRef.current) {
         prevDateRef.current = currentDate;
         await fetchHalls();
@@ -527,6 +636,7 @@ useEffect(() => {
   };
   loadHalls();
 }, [selectedDate, selectedLocation]);
+
 
   useEffect(() => {
     if (userData) {
@@ -555,13 +665,6 @@ useEffect(() => {
     setUserData(JSON.parse(savedUserData));
   }, []);
 
-  useEffect(() => {
-    const days = getNextDays();
-    if (days.length > 0) {
-      setSelectedDate(days[0]); // Выбираем первый день недели
-      setSelectedTimes({}); // Сбрасываем выбранное время
-    }
-  }, [selectedWeek]);
 
   useEffect(() => {
     if (showHistory && searchInputRef.current) {
@@ -616,20 +719,6 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [selectedWeek]); // Добавляем selectedWeek в зависимости
 
-  useEffect(() => {
-    console.log('Time sync effect running');
-    const syncTime = async () => {
-      console.log('Syncing time...');
-      const time = await fetchServerTime();
-      console.log('Got time:', time);
-      setServerTime(time);
-    };
-  
-    syncTime();
-    const interval = setInterval(syncTime, 60000);
-  
-    return () => clearInterval(interval);
-  }, []);
   
   useEffect(() => {
     if (selectedDate) {
@@ -754,18 +843,14 @@ useEffect(() => {
     return monday1.toDateString() === monday2.toDateString();
   };
 
-  const hasTimeConflict = (time, date, hallName) => {
-    const currentWeekDates = getNextDays();
-    const isCurrentWeekDate = currentWeekDates.some(d => 
-      d.toDateString() === date.toDateString()
-    );
-  
-    // Проверяем, есть ли уже запись на это время в любой локации
-    return bookings.some(booking => 
-      booking.time === time && 
-      new Date(booking.date).toDateString() === date.toDateString() &&
-      isCurrentWeekDate === (selectedWeek === 0)
-    );
+  // При рендеринге кнопок времени
+  const hasTimeConflict = (time) => {
+    console.log('Checking conflicts for time:', time);
+    return bookings.some(booking => {
+      const conflict = checkTimeConflict(booking, time, selectedDate, selectedLocation);
+      console.log('Conflict check result:', { booking, conflict });
+      return conflict;
+    });
   };
 
   const isPastDate = (date) => {
@@ -835,7 +920,7 @@ useEffect(() => {
         
         // Получаем новые данные
         await fetchHalls();
-        await fetchUserBookings();
+        await fetchBookings();
         
         // Если данные изменились, React автоматически обновит UI
         // Если нет - обновления UI не будет
@@ -848,48 +933,62 @@ useEffect(() => {
 
   // Эффект для обновления недель при загрузке и каждую полночь
   useEffect(() => {
-    updateWeeks(); // Проверяем при загрузке
-
-    // Вычисляем время до следующей полночи
+    updateWeeks();
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
     const timeUntilMidnight = tomorrow - now;
-
-    // Устанавливаем таймер на полночь
+  
     const timer = setTimeout(() => {
       updateWeeks();
-      // После первого срабатывания устанавливаем интервал каждые 24 часа
-      setInterval(updateWeeks, 24 * 60 * 60 * 1000);
+      const dailyTimer = setInterval(updateWeeks, 24 * 60 * 60 * 1000);
+      return () => clearInterval(dailyTimer);
     }, timeUntilMidnight);
-
-    return () => {
-      clearTimeout(timer);
-    };
+  
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     const days = getNextDays();
     if (days.length > 0) {
-      setSelectedDate(days[0]); // Выбираем первый день недели
-      setSelectedTimes({}); // Сбрасываем выбранное время
+      setSelectedDate(days[0]);
+      setSelectedTimes({});
     }
   }, [selectedWeek]);
 
   useEffect(() => {
-    const init = async () => {
-      await fetchServerTime(); // Сначала получаем серверное время
-      await fetchStudentProfile();
-      if (selectedDate && !isNaN(selectedDate.getTime())) {
-        console.log('Selected date changed:', selectedDate.toISOString());
-        await fetchHalls();
-        await fetchUserBookings();
-      }
-    };
-    init();
+    if (selectedDate && !isNaN(selectedDate.getTime())) {
+      fetchHalls();
+      fetchBookings();
+    }
   }, [selectedDate, selectedLocation]);
   
+  useEffect(() => {
+    const timeInterval = setInterval(fetchServerTime, 60000);
+    return () => clearInterval(timeInterval);
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchServerTime();
+      await fetchStudentProfile();
+    };
+    init();
+  }, []);
+
+  
+// useEffect(() => {
+//   const checkConflicts = () => {
+//     if (!selectedDate || !bookings.length) return;
+    
+//     // Форсируем перерисовку компонента
+//     setSelectedLocation(loc => loc === 'gorny' ? 'gorny' : 'belyaevo');
+//   };
+  
+//   checkConflicts();
+// }, [bookings, selectedDate]);
+
   // Компонент модального окна истории
   const HistoryModal = () => (
     <div className="modal-overlay" style={{
@@ -1112,7 +1211,9 @@ useEffect(() => {
                           new Date(booking.date).getTime() === selectedDate.getTime() &&
                           booking.location === (selectedLocation === 'gorny' ? 'Горный' : 'Беляево')
                       );
-                      const timeConflict = hasTimeConflict(time, selectedDate, hall.name) && !isMyBooking;
+                      const timeConflict = bookings.some(booking => 
+                        checkTimeConflict(booking, time, selectedDate, selectedLocation)
+                      );
                       const isFull = timeCapacity.current >= timeCapacity.max;
                       const isPast = isPastDate(selectedDate);
                       
@@ -1121,7 +1222,7 @@ useEffect(() => {
                           key={time}
                           className={`time-slot ${selectedTimes[hall.id] === time ? 'selected' : ''}`}
                           onClick={() => handleTimeSelect(hall.id, time)}
-                          disabled={isPast}
+                          disabled={isPast || timeConflict}
                           style={
                             isPast ? {
                               backgroundColor: '#f5f5f5',
@@ -1312,7 +1413,7 @@ useEffect(() => {
                   <button 
                     className="cancel-button"
                     onClick={() => {
-                      setBookings(bookings.filter(b => b.id !== booking.id));
+                      handleCancelBooking(booking.id);
                     }}
                   >
                     Отменить

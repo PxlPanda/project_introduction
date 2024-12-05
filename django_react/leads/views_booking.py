@@ -142,3 +142,38 @@ def booking_view(request):
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def booking_detail_view(request, booking_id):
+    """
+    DELETE: Удаление существующей записи
+    """
+    try:
+        # Получаем студента по текущему пользователю
+        student = Student.objects.get(user=request.user)
+        
+        # Получаем бронирование и проверяем, принадлежит ли оно текущему студенту
+        booking = Booking.objects.get(id=booking_id, student=student)
+        
+        # Удаляем бронирование
+        booking.delete()
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
+        
+    except Student.DoesNotExist:
+        return Response(
+            {'error': 'Student profile not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Booking.DoesNotExist:
+        return Response(
+            {'error': 'Booking not found or access denied'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error in delete_booking: {str(e)}")
+        return Response(
+            {'error': 'Internal server error'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

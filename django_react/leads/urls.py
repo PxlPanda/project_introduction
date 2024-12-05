@@ -4,7 +4,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from . import views
-from .views_booking import booking_view
+from .views_booking import booking_view, booking_detail_view
 
 router = DefaultRouter()
 router.register(r'register', views.RegistrationView, basename='register')
@@ -19,6 +19,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('users/me/', views.current_user, name='current-user'),
     path('bookings/', booking_view, name='booking_view'),
+    path('bookings/<int:booking_id>/', booking_detail_view, name='booking_detail'),
     path('student-data/', views.student_data, name='student-data'), 
     path('server-time/', views.server_time, name='server-time'),    
 
