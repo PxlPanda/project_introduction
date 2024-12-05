@@ -139,6 +139,7 @@ const StudentView = () => {
   const [userData, setUserData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
+  const prevDateRef = useRef(null);
   const [halls, setHalls] = useState({
     gorny: [],
     belyaevo: []
@@ -151,14 +152,14 @@ const StudentView = () => {
         return;
       }
   
-      // Преобразуем значение локации
       const locationName = selectedLocation === 'gorny' ? 'Горный' : 'Беляево';
+      const formattedDate = selectedDate.toISOString().split('T')[0];
   
       const response = await fetch(
-        `http://127.0.0.1:8000/leads/halls/?location=${encodeURIComponent(locationName)}`,
+        `http://127.0.0.1:8000/leads/halls/?location=${encodeURIComponent(locationName)}&date=${formattedDate}`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`, // Изменено с Token на Bearer
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         }
@@ -186,6 +187,7 @@ const StudentView = () => {
         }, {})
       }));
   
+      // Обновляем состояние, сохраняя предыдущие данные для другой локации
       setHalls(prev => ({
         ...prev,
         [selectedLocation]: formattedHalls
@@ -240,8 +242,8 @@ const StudentView = () => {
       
       // Обновляем данные о залах
       await fetchHalls();
-      
       showNotification('Запись успешно создана');
+
     } catch (error) {
       console.error('Error creating booking:', error);
       showNotification(error.message || 'Ошибка при создании записи');
@@ -514,11 +516,19 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 
-  useEffect(() => {
-    if (selectedDate) {
-      fetchHallOccupancy(selectedDate);
+useEffect(() => {
+  const loadHalls = async () => {
+    if (selectedDate && selectedLocation) {
+      const currentDate = selectedDate.toISOString().split('T')[0];
+      // Проверяем, действительно ли изменилась дата
+      if (currentDate !== prevDateRef.current) {
+        prevDateRef.current = currentDate;
+        await fetchHalls();
+      }
     }
-  }, [selectedDate, selectedLocation]);
+  };
+  loadHalls();
+}, [selectedDate, selectedLocation]);
 
   useEffect(() => {
     if (userData) {
@@ -546,14 +556,6 @@ useEffect(() => {
     }
     setUserData(JSON.parse(savedUserData));
   }, []);
-
-  useEffect(() => {
-    const days = getNextDays();
-    if (days.length > 0) {
-      setSelectedDate(days[0]); // Выбираем первый день недели
-      setSelectedTimes({}); // Сбрасываем выбранное время
-    }
-  }, [selectedWeek]);
 
   useEffect(() => {
     const days = getNextDays();
@@ -687,11 +689,6 @@ useEffect(() => {
         ...prev,
         [hallId]: time
       }));
-    }
-    
-    // Обновляем данные о загруженности при выборе времени
-    if (selectedDate) {
-      await fetchHallOccupancy(selectedDate, time);
     }
   };
 
@@ -831,16 +828,25 @@ useEffect(() => {
   };
 
   // Периодическое обновление данных каждые 30 секунд
-useEffect(() => {
-  const updateInterval = setInterval(() => {
-    if (selectedDate) {
-      fetchHalls();
-      fetchUserBookings();
-    }
-  }, 30000); // 30 секунд
+  useEffect(() => {
+    const updateInterval = setInterval(async () => {
+      // Проверяем, что у нас есть выбранная дата и она валидна
+      if (selectedDate && !isNaN(selectedDate.getTime())) {
+        // Сохраняем текущее состояние halls перед обновлением
+        const prevHalls = halls[selectedLocation];
+        
+        // Получаем новые данные
+        await fetchHalls();
+        await fetchUserBookings();
+        
+        // Если данные изменились, React автоматически обновит UI
+        // Если нет - обновления UI не будет
+      }
+    }, 30000); // 30 секунд
 
-  return () => clearInterval(updateInterval);
-}, [selectedDate]);
+    // Очищаем интервал при размонтировании компонента
+    return () => clearInterval(updateInterval);
+  }, [selectedDate, selectedLocation]); // Добавляем зависимости
 
   // Эффект для обновления недель при загрузке и каждую полночь
   useEffect(() => {
@@ -874,19 +880,12 @@ useEffect(() => {
   }, [selectedWeek]);
 
   useEffect(() => {
-    if (selectedDate) {
-      const currentTime = Object.values(selectedTimes)[0];
-      fetchHallOccupancy(selectedDate, currentTime);
-    }
-  }, [selectedDate, selectedLocation, selectedTimes]);
-
-  useEffect(() => {
     const init = async () => {
       await fetchServerTime(); // Сначала получаем серверное время
       await fetchStudentProfile();
       if (selectedDate && !isNaN(selectedDate.getTime())) {
         console.log('Selected date changed:', selectedDate.toISOString());
-        await fetchHallOccupancy();
+        await fetchHalls();
         await fetchUserBookings();
       }
     };

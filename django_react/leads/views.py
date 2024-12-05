@@ -74,6 +74,75 @@ class HallViewSet(viewsets.ReadOnlyModelViewSet):
         context['date'] = self.request.query_params.get('date')
         return context
 
+    def get_time_slots(self, location_name):
+        if location_name == "Горный":
+            return [
+                "09:00-10:35",
+                "10:50-12:25",
+                "12:40-14:15",
+                "14:30-16:06",
+                "16:30-18:05",
+                "18:20-20:00"
+            ]
+        else:  # Беляево
+            return [
+                "08:30-10:00",
+                "10:10-11:40",
+                "11:50-13:20",
+                "13:30-15:00"
+            ]
+
+    @action(detail=False, methods=['get'])
+    def available_halls(self, request):
+        try:
+            print("Getting available halls...")
+            halls_data = {
+                'gorny': [],
+                'belyaevo': []
+            }
+            
+            # Получаем все залы
+            halls = Hall.objects.select_related('location').all()
+            print(f"Found {halls.count()} halls")
+            
+            for hall in halls:
+                print(f"Processing hall: {hall.name} in {hall.location.name}")
+                location_key = 'gorny' if hall.location.name == 'Горный' else 'belyaevo'
+                time_slots = self.get_time_slots(hall.location.name)
+                
+                # Получаем все бронирования для этого зала на сегодня
+                bookings = Booking.objects.filter(
+                    hall=hall,
+                    date=timezone.now().date()
+                )
+                
+                # Создаем словарь занятости по временным слотам
+                time_slot_capacity = {}
+                for time_slot in time_slots:
+                    current_bookings = bookings.filter(time_slot=time_slot.split('-')[0]).count()
+                    time_slot_capacity[time_slot] = {
+                        'current': current_bookings,
+                        'max': hall.capacity
+                    }
+                
+                hall_data = {
+                    'id': hall.id,
+                    'name': hall.name,
+                    'capacity': hall.capacity,
+                    'timeSlots': time_slots,
+                    'timeSlotCapacity': time_slot_capacity
+                }
+                
+                halls_data[location_key].append(hall_data)
+                print(f"Added hall data for {hall.name}")
+            
+            print("Final halls data:", halls_data)
+            return Response(halls_data)
+            
+        except Exception as e:
+            print("Error in available_halls:", str(e))
+            return Response({'error': str(e)}, status=400)
+
 class PinnedHallViewSet(viewsets.ModelViewSet):
     serializer_class = PinnedHallSerializer
     permission_classes = [permissions.IsAuthenticated]

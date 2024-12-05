@@ -1,0 +1,86 @@
+[
+    {
+        "model": "leads.location",
+        "pk": 1,
+        "fields": {
+            "name": "Горный"
+        }
+    },
+    {
+        "model": "leads.location",
+        "pk": 2,
+        "fields": {
+            "name": "Беляево"
+        }
+    },
+    {
+        "model": "leads.hall",
+        "pk": 1,
+        "fields": {
+            "name": "Тренажерный зал",
+            "location": 1,
+            "capacity": 20,
+            "is_active": true
+        }
+    },
+    {
+        "model": "leads.hall",
+        "pk": 2,
+        "fields": {
+            "name": "Игровой зал",
+            "location": 1,
+            "capacity": 30,
+            "is_active": true
+        }
+    },
+    {
+        "model": "leads.hall",
+        "pk": 3,
+        "fields": {
+            "name": "Зал для фитнеса",
+            "location": 1,
+            "capacity": 25,
+            "is_active": true
+        }
+    },
+    {
+        "model": "leads.hall",
+        "pk": 4,
+        "fields": {
+            "name": "Зал для бокса",
+            "location": 1,
+            "capacity": 15,
+            "is_active": true
+        }
+    },
+    {
+        "model": "leads.hall",
+        "pk": 5,
+        "fields": {
+            "name": "Бассейн",
+            "location": 2,
+            "capacity": 20,
+            "is_active": true
+        }
+    },
+    {
+        "model": "leads.hall",
+        "pk": 6,
+        "fields": {
+            "name": "Игровой зал",
+            "location": 2,
+            "capacity": 30,
+            "is_active": true
+        }
+    },
+    {
+        "model": "leads.hall",
+        "pk": 7,
+        "fields": {
+            "name": "Зал фитнеса",
+            "location": 2,
+            "capacity": 25,
+            "is_active": true
+        }
+    }
+]
