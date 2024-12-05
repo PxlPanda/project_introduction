@@ -7,6 +7,9 @@ from aiogram.fsm.context import FSMContext
 from .keyboards import inline_keyboard_auth, inline_keyboard_log_in_users, start_reply_keyboard, inline_keyboard_sign_in_users, register_button
 from ..registration_service import UserService
 from User_aut.mail_validation import send_email
+from API.NYTimes import NWTimes_API
+
+tg_NW = NWTimes_API()
 
 class Register(StatesGroup):
     name = State()
@@ -22,12 +25,20 @@ class Register(StatesGroup):
     confirmed = State()
     reg_started = State()
     
+class NW_Times(StatesGroup):
+    author = State()
+    
+class User(StatesGroup):
+    admin = State()
+    authorised = State()
+    unauthorised = State()
+    
 
 router = Router()
 bot_user_service = UserService()
 number_for_confirming = ""
 
-@router.message(F.text.upper().in_({"ГЛАВНАЯ", "MAIN", "/START"}))
+@router.message(F.text.upper().in_({"ГЛАВНАЯ", "MAIN", "/START", "МЕНЮ"}))
 async def cmd_start(message: Message):
     await message.answer("Бу! Испугался? Не бойся. Я МИСИСовский бот. Не бойся меня. Используй меня. Запишись на физру. У тебя будет все: деньги, телки, тачки, админки (ну и далее по списку)", reply_markup = start_reply_keyboard)
     await message.reply("Накачаться хочешь?")
@@ -99,7 +110,25 @@ async def register(message:Message, state: FSMContext):
     await state.set_state(Register.name)
     await message.answer("Ваше имя")
     
+ 
+@router.message(F.text == "Резензии на книги автора в NewYorkPost (не шутка, просто играюсь с API) (пример ввода: Stephen King)")
+async def reviwes_NewYork(message: Message, state: FSMContext):
+    await state.set_state(NW_Times.author)
+    await message.answer("Введите имя автора, рецензии на чьи книги вы хотите посмотреть")
+
+
+@router.message(NW_Times.author)
+async def reviews_NewYork(message: Message, state: FSMContext):
+    await state.update_data(author = message.text)
+    data = await state.get_data()
+    reviews = tg_NW.get_reviews(author = data["author"])
+    reviews = reviews.split("\n")
+    review_1, review_2, review_3 = reviews[0], reviews[1], reviews[2] 
+    await message.answer(review_1)
+    await message.answer(review_2)
+    await message.answer(review_3)
     
+       
 @router.message(Register.name)
 async def reg_name(message: Message, state: FSMContext):
     await state.update_data(name = message.text)
@@ -143,7 +172,6 @@ async def reg_password(message: Message, state: FSMContext):
 async def reg_password_rep(message: Message, state: FSMContext):
     await state.update_data(password_rep = message.text)
     data = await state.get_data()
-    print(data)
     if data["password_rep"] == data["password_reg"]:
         if await bot_user_service.check_user(email = data["email_reg"]) == None:
             global number_for_confirming

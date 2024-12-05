@@ -38,3 +38,7 @@ class Token():
         
         # Идентифицируем пользователя
         return payload["sub"]
+
+
+
+

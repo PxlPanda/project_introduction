@@ -1,8 +1,9 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 start_reply_keyboard = ReplyKeyboardMarkup(keyboard = [
-    [KeyboardButton(text = "Вход"), KeyboardButton(text = "Не проработано")],
-    [KeyboardButton(text = "Не проработано 2")],
+    [KeyboardButton(text = "Вход/Регистрация/Восстановление пароля")],
+    [KeyboardButton(text = "Запись на занятия"), KeyboardButton(text = "Просмотр имеющихся записей")], 
+    [KeyboardButton(text = "Резензии на книги автора в NewYorkPost (не шутка, просто играюсь с API) (пример ввода: Stephen King)")],
     ], resize_keyboard= True, input_field_placeholder="Выбери чонить по-братски")
 
 

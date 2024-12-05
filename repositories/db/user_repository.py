@@ -7,6 +7,7 @@ import os
 from hashlib import sha256
 from dotenv import load_dotenv#type: ignore
 from User_aut.mail_validation import send_email
+from pydantic import BaseModel
 
 
 load_dotenv()
@@ -26,8 +27,8 @@ class UserRepository:
         uuid = uuid4_as_str()
         token = str(Token.give_token(id = uuid))
         hashed_password = sha256()
+        password = password + os.getenv("SALT")
         hashed_password.update(password.encode())
-        hashed_password.update(os.getenv("SALT").encode())
         hashed_password = str(hashed_password.hexdigest())
         #email_num = await send_email()
         stmp = insert(User).values({"id" : uuid, "email" : email, "name" : name, "surname" : surname, "patronymic" : patronymic, "password" : hashed_password, "is_admin" : is_admin, "token" : token})

@@ -37,7 +37,7 @@ def create_all_psyco_tables() -> None:
     
     async def init_models():
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all(engine))
+            await conn.run_sync(Base.metadata.create_all)
 
     asyncio.run(init_models())
 

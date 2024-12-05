@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from services.registration_service import UserService
 from services.table_service import TableService
 from services.autentification_service import Autent
-
+from API.NYTimes import NWTimes_API
+from User_aut.auth2 import AuthJWT
 
 app = FastAPI(title = "Service for PE in MISIS")
 
@@ -11,6 +12,11 @@ registration_service = UserService()
 
 table_service = TableService()
 
+NW_API = NWTimes_API()
+
+class TokenInfo(BaseModel):
+    access_token: str
+    token_type: str
 
 @app.post("/login")
 async def auth(email:str, password:str, response:Response) -> str:
@@ -57,5 +63,25 @@ def check_token(request, authorization_header):
 async def create_token(id):
     return await Autent.create_token(id)
     
+
+
+@app.post("/create_token2", response_model=TokenInfo)
+def create_token(id):
+    payload = {
+        "sub": "1",
+        "email": "1"
+    }
+    token = AuthJWT
+    token.encode
+    return TokenInfo(access_token = token,
+                     token_type = "Bearer")
     
+@app.get("/check_token")
+def check_token(token):
+    token = AuthJWT
 #-------------------------------------------------------------TGBOT PART--------------------------------------------------------------------
+#-------------------------------------------------------------API PART----------------------------------------------------------------------
+@app.get("/get_books_author")
+def get_books_author(author):
+    return NW_API.get_reviews(author = author)
+    #return NW_API.get_reviews(author = author)
