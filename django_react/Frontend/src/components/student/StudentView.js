@@ -67,12 +67,10 @@ const defaultHalls = {
       name: 'Тренажерный зал',
       capacity: 25,
       timeSlotCapacity: {
-        '9:00': { current: 0, max: 25 },
-        '10:50': { current: 0, max: 25 },
-        '12:40': { current: 0, max: 25 },
-        '14:30': { current: 0, max: 25 },
-        '16:30': { current: 0, max: 25 },
-        '18:20': { current: 0, max: 25 },
+        '8:30': { current: 0, max: 25 },
+        '10:10': { current: 0, max: 25 },
+        '11:50': { current: 0, max: 25 },
+        '13:30': { current: 0, max: 25 },
       }
     },
     {
@@ -81,11 +79,9 @@ const defaultHalls = {
       capacity: 35,
       timeSlotCapacity: {
         '9:00': { current: 0, max: 35 },
-        '10:50': { current: 0, max: 35 },
-        '12:40': { current: 0, max: 35 },
-        '14:30': { current: 0, max: 35 },
-        '16:30': { current: 0, max: 35 },
-        '18:20': { current: 0, max: 35 },
+        '10:10': { current: 0, max: 35 },
+        '11:50': { current: 0, max: 35 },
+        '13:30': { current: 0, max: 35 },
       }
     },
     {
@@ -94,11 +90,9 @@ const defaultHalls = {
       capacity: 8,
       timeSlotCapacity: {
         '9:00': { current: 0, max: 8 },
-        '10:50': { current: 0, max: 8 },
-        '12:40': { current: 0, max: 8 },
-        '14:30': { current: 0, max: 8 },
-        '16:30': { current: 0, max: 8 },
-        '18:20': { current: 0, max: 8 },
+        '10:10': { current: 0, max: 8 },
+        '11:50': { current: 0, max: 8 },
+        '13:30': { current: 0, max: 8 },
       }
     }
   ]
@@ -110,7 +104,10 @@ const HALLS = {
 };
 
 // Временные слоты
-const timeSlots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
+const timeSlots = {
+  gorny: ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'],
+  belyaevo: ['8:30', '10:10', '11:50', '13:30']
+};
 
 const StudentView = () => {
   console.log('StudentView rendering');  // Добавьте эту строку в начало компонента
@@ -173,11 +170,12 @@ const StudentView = () => {
       const data = await response.json();
       
       // Преобразуем данные в нужный формат
+      // В функции fetchHalls измените эту часть:
       const formattedHalls = data.map(hall => ({
         id: hall.id,
         name: hall.name,
         capacity: hall.capacity,
-        timeSlotCapacity: timeSlots.reduce((acc, time) => {
+        timeSlotCapacity: timeSlots[selectedLocation].reduce((acc, time) => {
           const bookingsForTime = hall.bookings?.filter(b => b.time_slot === time) || [];
           acc[time] = {
             current: bookingsForTime.length,
