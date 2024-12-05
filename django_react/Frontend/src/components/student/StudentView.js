@@ -1016,23 +1016,7 @@ useEffect(() => {
           window.location.href = '/login';
         }}>Выйти</button>
       </header>
-      
-      {/* Блок профиля студента */}
-    <div className="student-profile">
-      <h2>Профиль студента</h2>
-      <div className="info-row">
-        <span className="info-label">ФИО:</span>
-        <span className="info-value">{studentName}</span>
-      </div>
-      <div className="info-row">
-        <span className="info-label">Группа:</span>
-        <span className="info-value">{studentGroup}</span>
-      </div>
-      <div className="info-row">
-        <span className="info-label">Номер студенческого:</span>
-        <span className="info-value">{studentId}</span>
-      </div>
-
+    <div>
       {/* История баллов */}
       <div className="points-history-section">
         <h3>История баллов</h3>

@@ -143,12 +143,17 @@ function Login({ onLogin }) {
     try {
       // Если это регистрация
       if (isRegistration) {
-        const registrationData = {
+        // Для студента отправляем все поля, для преподавателя только нужные
+        const registrationData = isStudent ? {
           email: formValue.email,
           full_name: formValue.fullName,
           password: formValue.password,
           student_number: formValue.studentNumber,
           group_name: formValue.groupName
+        } : {
+          full_name: formValue.fullName,
+          password: formValue.password,
+          admin_password: formValue.adminPassword
         };
 
         console.log('Отправляемые данные:', registrationData);
@@ -168,99 +173,113 @@ function Login({ onLogin }) {
         }
       }
       
-      const loginResponse = await fetch('/leads/token/', {
+      // Авторизация - разные данные для студента и преподавателя
+      const loginData = isStudent ? {
+        email: formValue.email,
+        password: formValue.password,
+        user_type: 'student' 
+      } : {
+        full_name: formValue.fullName,
+        password: formValue.password,
+        admin_password: formValue.adminPassword,
+        user_type: 'teacher' 
+      };
+      const loginResponse = await fetch('/api/login/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          user_type: isStudent ? 'student' : 'teacher',
-          email: isStudent ? formValue.email : undefined,
-          full_name: !isStudent ? formValue.fullName : undefined,  // Отправляем ФИО только для преподавателя
-          password: formValue.password,
-          ...((!isStudent && !isRegistration) && { adminPassword: formValue.adminPassword })
-        })
+        body: JSON.stringify(loginData)
       });
   
-      const loginData = await loginResponse.json();
+      const loginResponseData = await loginResponse.json();
   
       if (!loginResponse.ok) {
-        throw new Error(loginData.error || 'Ошибка авторизации');
+        throw new Error(loginResponseData.error || 'Ошибка авторизации');
       }
   
       // Сохраняем токен и данные пользователя
-      localStorage.setItem('token', loginData.access);
-      localStorage.setItem('refreshToken', loginData.refresh);
+      localStorage.setItem('token', loginResponseData.access);
+      localStorage.setItem('refreshToken', loginResponseData.refresh);
       localStorage.setItem('userType', isStudent ? 'student' : 'teacher');
-      localStorage.setItem('userData', JSON.stringify({
-        type: loginData.user_type,
-        name: loginData.full_name,
-        ...(loginData.user_type === 'student' && {
-          email: loginData.email,
-          group: formValue.groupName,
-          studentId: formValue.studentNumber
-        })
-      }));
-  
+      
+      // Сохраняем только нужные данные в зависимости от типа пользователя
+      const userData = isStudent ? {
+        type: 'student',
+        name: formValue.fullName,
+        email: formValue.email,
+        group: formValue.groupName,
+        studentId: formValue.studentNumber
+      } : {
+        type: 'teacher',
+        name: formValue.fullName
+      };
+      
+      localStorage.setItem('userData', JSON.stringify(userData));
+
+      // Вызываем колбэк успешного входа
       onLogin();
+      
+      // Перенаправляем на главную страницу
       navigate('/main');
     } catch (error) {
       console.error('Error:', error);
-      setErrorMessage(error.message || 'Произошла ошибка');
+      setErrorMessage(error.message);
     }
-  };
+};
+  
+const resetForm = () => {
+  setFormValue({
+    email: '',
+    password: '',
+    passwordConfirm: '',
+    adminPassword: '',
+    fullName: '',
+    studentNumber: '',
+    groupName: ''
+  });
+  setIsValid({
+    email: true,
+    password: true,
+    passwordConfirm: true,
+    adminPassword: true,
+    fullName: true,
+    studentNumber: true,
+    groupName: true
+  });
+  setErrorMessage('');
+};
 
-  const resetForm = () => {
-    setFormValue({
-      email: '',
-      password: '',
-      passwordConfirm: '',
-      adminPassword: '',
-      fullName: '',
-      studentNumber: '',
-      groupName: ''
-    });
-    setIsValid({
-      email: true,
-      password: true,
-      passwordConfirm: true,
-      adminPassword: true,
-      fullName: true,
-      studentNumber: true,
-      groupName: true
-    });
-    setErrorMessage('');
-  };
+const toggleUserType = () => {
+  const containers = formRef.current.querySelectorAll('.login__input-container');
+  const buttons = formRef.current.querySelector('.login__buttons');
+  const message = formRef.current.querySelector('.login__message');
+  
+  containers.forEach(container => container.classList.remove('visible'));
+  buttons.classList.remove('visible');
+  if (message) message.classList.remove('visible');
 
-  const toggleUserType = () => {
-    const containers = formRef.current.querySelectorAll('.login__input-container');
-    const buttons = formRef.current.querySelector('.login__buttons');
-    const message = formRef.current.querySelector('.login__message');
-    
-    containers.forEach(container => container.classList.remove('visible'));
-    buttons.classList.remove('visible');
-    if (message) message.classList.remove('visible');
+  setTimeout(() => {
+    setIsStudent(!isStudent);
+    resetForm();
+  }, 300);
+};
 
-    setTimeout(() => {
-      setIsStudent(!isStudent);
-      resetForm();
-    }, 300);
-  }
+const toggleRegistration = () => {
+  const containers = formRef.current.querySelectorAll('.login__input-container');
+  const buttons = formRef.current.querySelector('.login__buttons');
+  const message = formRef.current.querySelector('.login__message');
+  
+  containers.forEach(container => container.classList.remove('visible'));
+  buttons.classList.remove('visible');
+  if (message) message.classList.remove('visible');
 
-  const toggleRegistration = () => {
-    const containers = formRef.current.querySelectorAll('.login__input-container');
-    const buttons = formRef.current.querySelector('.login__buttons');
-    const message = formRef.current.querySelector('.login__message');
-    
-    containers.forEach(container => container.classList.remove('visible'));
-    buttons.classList.remove('visible');
-    if (message) message.classList.remove('visible');
+  setTimeout(() => {
+    setIsRegistration(!isRegistration);
+    resetForm();
+  }, 300);
+};
 
-    setTimeout(() => {
-      setIsRegistration(!isRegistration);
-      resetForm();
-    }, 300);
-  }
 
   return (
     <div className="login">
