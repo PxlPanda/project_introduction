@@ -56,6 +56,7 @@ const TeacherView = () => {
   const [awardingPoints, setAwardingPoints] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef(null);
+  const [originalStudents, setOriginalStudents] = useState([]);
 
   const fetchStudents = async (hall, timeSlot) => {
     try {
@@ -92,6 +93,7 @@ const TeacherView = () => {
       
       const data = await response.json();
       console.log('Received students:', data);
+      setOriginalStudents(data);
       setStudentsForTimeSlot(data);
       setShowStudentsList(true);
     } catch (error) {
@@ -181,13 +183,21 @@ const TeacherView = () => {
   }, []);
 
   useEffect(() => {
+    if (!showStudentsList) {
+      setSearchName('');
+      setSearchGroup('');
+      setStudentsForTimeSlot(originalStudents);
+    }
+  }, [showStudentsList]);
+
+  useEffect(() => {
     if (isSearchFocused && searchInputRef.current) {
       searchInputRef.current.focus();
     }
   }, [searchName, isSearchFocused]);
 
   const handleSearch = () => {
-    const filtered = studentsForTimeSlot.filter(student => {
+    const filtered = originalStudents.filter(student => {
       const nameMatch = student.name.toLowerCase().includes(searchName.toLowerCase());
       const groupMatch = !searchGroup || student.group === searchGroup;
       return nameMatch && groupMatch;
@@ -575,7 +585,7 @@ const TeacherView = () => {
   document.head.appendChild(styleSheet);
 
   const StudentsList = () => {
-    const uniqueGroups = [...new Set(studentsForTimeSlot.map(student => student.group))];
+    const uniqueGroups = [...new Set(originalStudents.map(student => student.group))];
     const [isEditingPoints, setIsEditingPoints] = useState(false);
     const [tempPoints, setTempPoints] = useState(maxPoints);
     
