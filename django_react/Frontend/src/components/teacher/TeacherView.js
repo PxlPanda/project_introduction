@@ -959,7 +959,7 @@ const TeacherView = () => {
                   <h3 className="hall-title">{hall.name}</h3>
                   <div className="time-slots-wrapper">
                     <div className="time-slots">
-                      {timeSlots.map(time => (
+                      {timeSlots[selectedLocation.toLowerCase()].map(time => (
                         <button
                           key={time}
                           className={`time-slot ${selectedTimeSlots[hall.id] === time ? 'selected' : ''}`}
