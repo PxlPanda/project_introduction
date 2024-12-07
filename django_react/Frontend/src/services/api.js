@@ -22,7 +22,9 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/signin';
+      localStorage.removeItem('userData');
+      localStorage.removeItem('userType');
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
@@ -30,7 +32,15 @@ api.interceptors.response.use(
 
 // Authentication related API calls
 export const login = (credentials) => {
-  return api.post('/token/', credentials);
+  return api.post('/login/', credentials);
+};
+
+export const registerStudent = (data) => {
+  return api.post('/register-student/', data);
+};
+
+export const registerTeacher = (data) => {
+  return api.post('/register-teacher/', data);
 };
 
 // Hall related API calls

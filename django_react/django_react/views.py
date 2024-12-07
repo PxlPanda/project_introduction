@@ -35,6 +35,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from rest_framework_simplejwt.tokens import RefreshToken
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +73,10 @@ def login_api(request):
                 auth_user = authenticate(request, email=email, password=password)
                 
                 if auth_user is not None:
-                    token, _ = Token.objects.get_or_create(user=user)
+                    # Создаем JWT токен
+                    refresh = RefreshToken.for_user(user)
                     return Response({
-                        'token': token.key,
+                        'token': str(refresh.access_token),
                         'user_type': 'student',
                         'full_name': user.full_name,
                         'email': user.email
@@ -108,9 +110,10 @@ def login_api(request):
                 auth_user = authenticate(request, email=user.email, password=password)
                 
                 if auth_user is not None:
-                    token, _ = Token.objects.get_or_create(user=user)
+                    # Создаем JWT токен
+                    refresh = RefreshToken.for_user(user)
                     return Response({
-                        'token': token.key,
+                        'token': str(refresh.access_token),
                         'user_type': 'teacher',
                         'full_name': user.full_name,
                         'email': user.email

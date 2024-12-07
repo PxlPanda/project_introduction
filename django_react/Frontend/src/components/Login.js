@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
+import { login, registerStudent, registerTeacher } from '../services/api';
 
-function Login({ onLogin }) {
+const Login = ({ onLogin }) => {
   const [isStudent, setIsStudent] = useState(true);
   const [isRegistration, setIsRegistration] = useState(false);
   const formRef = useRef(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const [formValue, setFormValue] = useState({
     email: '',
     password: '',
@@ -15,7 +17,6 @@ function Login({ onLogin }) {
     studentNumber: '',
     groupName: ''
   });
-  const [errorMessage, setErrorMessage] = useState('');
   const [isValid, setIsValid] = useState({
     email: true,
     password: true,
@@ -28,19 +29,23 @@ function Login({ onLogin }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Добавляем класс visible ко всем контейнерам с задержкой
-    const containers = formRef.current.querySelectorAll('.login__input-container');
-    containers.forEach((container, index) => {
-      setTimeout(() => {
-        container.classList.add('visible');
-      }, index * 100);
-    });
+    if (formRef.current) {
+      // Добавляем класс visible ко всем контейнерам с задержкой
+      const containers = formRef.current.querySelectorAll('.login__input-container');
+      containers.forEach((container, index) => {
+        setTimeout(() => {
+          container.classList.add('visible');
+        }, index * 100);
+      });
 
-    // Добавляем класс visible к кнопкам
-    const buttons = formRef.current.querySelector('.login__buttons');
-    setTimeout(() => {
-      buttons.classList.add('visible');
-    }, containers.length * 100);
+      // Добавляем класс visible к кнопкам
+      const buttons = formRef.current.querySelector('.login__buttons');
+      if (buttons) {
+        setTimeout(() => {
+          buttons.classList.add('visible');
+        }, containers.length * 100);
+      }
+    }
   }, [isStudent, isRegistration]);
 
   useEffect(() => {
@@ -141,145 +146,134 @@ function Login({ onLogin }) {
     }
   
     try {
-      // Если это регистрация
       if (isRegistration) {
-        // Для студента отправляем все поля, для преподавателя только нужные
         const registrationData = isStudent ? {
           email: formValue.email,
-          full_name: formValue.fullName,
           password: formValue.password,
           student_number: formValue.studentNumber,
-          group_name: formValue.groupName
+          group_name: formValue.groupName,
+          user_type: 'student'
         } : {
           full_name: formValue.fullName,
           password: formValue.password,
-          admin_password: formValue.adminPassword
+          admin_password: formValue.adminPassword,
+          user_type: 'teacher'
         };
 
         console.log('Отправляемые данные:', registrationData);
 
-        const registrationResponse = await fetch(`/api/${isStudent ? 'register-student' : 'register-teacher'}/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(registrationData)
-        });
-  
-        const responseJson = await registrationResponse.json();
-        
-        if (!registrationResponse.ok) {
-          throw new Error(responseJson.error || 'Ошибка регистрации');
+        try {
+          const registrationResponse = isStudent 
+            ? await registerStudent(registrationData)
+            : await registerTeacher(registrationData);
+          
+          const responseData = registrationResponse.data;
+          
+          // После успешной регистрации автоматически входим
+          setIsRegistration(false);
+          setFormValue({
+            ...formValue,
+            passwordConfirm: ''
+          });
+        } catch (error) {
+          throw new Error(error.response?.data?.error || 'Ошибка регистрации');
         }
       }
-      
+
       // Авторизация - разные данные для студента и преподавателя
       const loginData = isStudent ? {
         email: formValue.email,
         password: formValue.password,
-        user_type: 'student' 
+        user_type: 'student'
       } : {
         full_name: formValue.fullName,
         password: formValue.password,
         admin_password: formValue.adminPassword,
-        user_type: 'teacher' 
+        user_type: 'teacher'
       };
-      const loginResponse = await fetch('/api/login/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginData)
-      });
-  
-      const loginResponseData = await loginResponse.json();
-  
-      if (!loginResponse.ok) {
-        throw new Error(loginResponseData.error || 'Ошибка авторизации');
-      }
-  
-      // Сохраняем токен и данные пользователя
-      localStorage.setItem('token', loginResponseData.access);
-      localStorage.setItem('refreshToken', loginResponseData.refresh);
-      localStorage.setItem('userType', isStudent ? 'student' : 'teacher');
-      
-      // Сохраняем только нужные данные в зависимости от типа пользователя
-      const userData = isStudent ? {
-        type: 'student',
-        name: formValue.fullName,
-        email: formValue.email,
-        group: formValue.groupName,
-        studentId: formValue.studentNumber
-      } : {
-        type: 'teacher',
-        name: formValue.fullName
-      };
-      
-      localStorage.setItem('userData', JSON.stringify(userData));
 
-      // Вызываем колбэк успешного входа
-      onLogin();
-      
-      // Перенаправляем на главную страницу
-      navigate('/main');
+      try {
+        const response = await login(loginData);
+        const loginResponseData = response.data;
+
+        // Сохраняем токен и данные пользователя
+        localStorage.setItem('token', loginResponseData.token);
+        localStorage.setItem('userType', loginResponseData.user_type);
+        
+        // Сохраняем данные пользователя
+        const userData = {
+          type: loginResponseData.user_type,
+          name: loginResponseData.full_name,
+          email: loginResponseData.email
+        };
+        
+        localStorage.setItem('userData', JSON.stringify(userData));
+
+        // Вызываем колбэк успешного входа
+        onLogin();
+
+        // Перенаправляем на главную страницу
+        navigate('/');
+      } catch (error) {
+        throw new Error(error.response?.data?.error || 'Ошибка авторизации');
+      }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Ошибка:', error);
       setErrorMessage(error.message);
     }
-};
-  
-const resetForm = () => {
-  setFormValue({
-    email: '',
-    password: '',
-    passwordConfirm: '',
-    adminPassword: '',
-    fullName: '',
-    studentNumber: '',
-    groupName: ''
-  });
-  setIsValid({
-    email: true,
-    password: true,
-    passwordConfirm: true,
-    adminPassword: true,
-    fullName: true,
-    studentNumber: true,
-    groupName: true
-  });
-  setErrorMessage('');
-};
+  };
 
-const toggleUserType = () => {
-  const containers = formRef.current.querySelectorAll('.login__input-container');
-  const buttons = formRef.current.querySelector('.login__buttons');
-  const message = formRef.current.querySelector('.login__message');
-  
-  containers.forEach(container => container.classList.remove('visible'));
-  buttons.classList.remove('visible');
-  if (message) message.classList.remove('visible');
+  const resetForm = () => {
+    setFormValue({
+      email: '',
+      password: '',
+      passwordConfirm: '',
+      adminPassword: '',
+      fullName: '',
+      studentNumber: '',
+      groupName: ''
+    });
+    setIsValid({
+      email: true,
+      password: true,
+      passwordConfirm: true,
+      adminPassword: true,
+      fullName: true,
+      studentNumber: true,
+      groupName: true
+    });
+    setErrorMessage('');
+  };
 
-  setTimeout(() => {
-    setIsStudent(!isStudent);
-    resetForm();
-  }, 300);
-};
+  const toggleUserType = () => {
+    const containers = formRef.current.querySelectorAll('.login__input-container');
+    const buttons = formRef.current.querySelector('.login__buttons');
+    const message = formRef.current.querySelector('.login__message');
+    
+    containers.forEach(container => container.classList.remove('visible'));
+    buttons.classList.remove('visible');
+    if (message) message.classList.remove('visible');
 
-const toggleRegistration = () => {
-  const containers = formRef.current.querySelectorAll('.login__input-container');
-  const buttons = formRef.current.querySelector('.login__buttons');
-  const message = formRef.current.querySelector('.login__message');
-  
-  containers.forEach(container => container.classList.remove('visible'));
-  buttons.classList.remove('visible');
-  if (message) message.classList.remove('visible');
+    setTimeout(() => {
+      setIsStudent(!isStudent);
+      resetForm();
+    }, 300);
+  };
 
-  setTimeout(() => {
-    setIsRegistration(!isRegistration);
-    resetForm();
-  }, 300);
-};
+  const toggleRegistration = () => {
+    const containers = formRef.current.querySelectorAll('.login__input-container');
+    const buttons = formRef.current.querySelector('.login__buttons');
+    const message = formRef.current.querySelector('.login__message');
+    
+    containers.forEach(container => container.classList.remove('visible'));
+    buttons.classList.remove('visible');
+    if (message) message.classList.remove('visible');
 
+    setTimeout(() => {
+      setIsRegistration(!isRegistration);
+      resetForm();
+    }, 300);
+  };
 
   return (
     <div className="login">
@@ -292,6 +286,7 @@ const toggleRegistration = () => {
           
           {isStudent ? (
             <>
+
               <div className="login__input-container">
                 <input
                   className={`login__input ${!isValid.email || (errorMessage && errorMessage.includes('email уже зарегистрирован')) ? 'invalid' : ''}`}
@@ -340,6 +335,7 @@ const toggleRegistration = () => {
 
               {isRegistration && (
                 <>
+
                   <div className="login__input-container">
                     <input
                       className={`login__input ${!isValid.passwordConfirm ? 'invalid' : ''}`}
@@ -382,10 +378,13 @@ const toggleRegistration = () => {
                     <span className="login__input-hint">Формат: АБВГ-11-22</span>
                   </div>
                 </>
+
               )}
             </>
+
           ) : (
             <>
+
               <div className="login__input-container">
                 <input
                   className={`login__input ${!isValid.fullName || (errorMessage && errorMessage.includes('ФИО уже зарегистрирован')) ? 'invalid' : ''}`}
@@ -448,6 +447,7 @@ const toggleRegistration = () => {
                 </div>
               )}
             </>
+
           )}
 
           <div className="login__buttons">
