@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { HALLS } from '../constants/halls';
 import { timeSlots } from '../constants/timeSlots';
 import '../styles/base.css';
@@ -9,12 +9,16 @@ import '../styles/header.css';
 import '../styles/calendar.css';
 
 const SearchInput = React.memo(({ value, onChange }) => {
+  const handleChange = useCallback((e) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
   return (
     <input
       type="text"
       placeholder="Поиск по ФИО"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={handleChange}
       style={{
         width: '100%',
         padding: '8px',
@@ -23,6 +27,148 @@ const SearchInput = React.memo(({ value, onChange }) => {
         fontSize: '14px'
       }}
     />
+  );
+});
+
+const StudentsList = React.memo(({ 
+  searchName, 
+  setSearchName, 
+  searchGroup, 
+  setSearchGroup,
+  originalStudents,
+  studentsForTimeSlot,
+  setShowStudentsList,
+  selectedStudents,
+  setSelectedStudents,
+  maxPoints,
+  setMaxPoints,
+  handleSavePoints
+}) => {
+  const uniqueGroups = [...new Set(originalStudents.map(student => student.group))];
+  const [isEditingPoints, setIsEditingPoints] = useState(false);
+  const [tempPoints, setTempPoints] = useState(maxPoints);
+  
+  const handlePointsEdit = () => {
+    setIsEditingPoints(true);
+    setTempPoints(maxPoints);
+  };
+
+  const handlePointsSave = () => {
+    const points = Math.max(1, Math.min(100, parseInt(tempPoints) || 1));
+    setMaxPoints(points);
+    setTempPoints(points);
+    setIsEditingPoints(false);
+  };
+
+  const handlePointsKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handlePointsSave();
+    } else if (e.key === 'Escape') {
+      setIsEditingPoints(false);
+      setTempPoints(maxPoints);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h2>Отметить посещаемость</h2>
+          <button 
+            className="close-button"
+            onClick={() => setShowStudentsList(false)}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="students-list-container">
+          <div className="search-filters">
+            <div className="search-group">
+              <SearchInput value={searchName} onChange={setSearchName} />
+              <select
+                value={searchGroup}
+                onChange={(e) => setSearchGroup(e.target.value)}
+                className="group-select"
+              >
+                <option value="">Все группы</option>
+                {uniqueGroups.map(group => (
+                  <option key={group} value={group}>{group}</option>
+                ))}
+              </select>
+            </div>
+            <div className="points-container" onClick={handlePointsEdit}>
+              <div className="points-label">Баллы за занятие:</div>
+              {isEditingPoints ? (
+                <input
+                  type="number"
+                  className="points-input"
+                  value={tempPoints}
+                  onChange={(e) => setTempPoints(e.target.value)}
+                  onBlur={handlePointsSave}
+                  onKeyDown={handlePointsKeyDown}
+                  min="1"
+                  max="100"
+                  autoFocus
+                />
+              ) : (
+                <div className="points-value" title="Нажмите для редактирования">
+                  {maxPoints}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="students-table">
+            <div className="table-header">
+              <div className="header-cell">ФИО</div>
+              <div className="header-cell">Группа</div>
+              <div className="header-cell">Статус</div>
+            </div>
+            {studentsForTimeSlot.map(student => (
+              <div key={student.id} className="table-row">
+                <div className="table-cell">{student.name}</div>
+                <div className="table-cell">{student.group}</div>
+                <div className="table-cell">
+                  <label className="attendance-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.has(student.id)}
+                      onChange={(e) => {
+                        const newSelected = new Set(selectedStudents);
+                        if (e.target.checked) {
+                          newSelected.add(student.id);
+                        } else {
+                          newSelected.delete(student.id);
+                        }
+                        setSelectedStudents(newSelected);
+                      }}
+                    />
+                    <span className="checkmark"></span>
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="action-buttons">
+            <button 
+              className="cancel-button"
+              onClick={() => setShowStudentsList(false)}
+            >
+              Отмена
+            </button>
+            <button 
+              className="save-button"
+              onClick={handleSavePoints}
+              disabled={selectedStudents.size === 0}
+            >
+              Сохранить посещаемость
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 });
 
@@ -54,7 +200,6 @@ const TeacherView = () => {
   const [pointsToAward, setPointsToAward] = useState('');
   const [pointsReason, setPointsReason] = useState('');
   const [awardingPoints, setAwardingPoints] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef(null);
   const [originalStudents, setOriginalStudents] = useState([]);
 
@@ -189,12 +334,6 @@ const TeacherView = () => {
       setStudentsForTimeSlot(originalStudents);
     }
   }, [showStudentsList]);
-
-  useEffect(() => {
-    if (isSearchFocused && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [searchName, isSearchFocused]);
 
   const handleSearch = () => {
     const filtered = originalStudents.filter(student => {
@@ -584,141 +723,6 @@ const TeacherView = () => {
   styleSheet.innerText = styles;
   document.head.appendChild(styleSheet);
 
-  const StudentsList = () => {
-    const uniqueGroups = [...new Set(originalStudents.map(student => student.group))];
-    const [isEditingPoints, setIsEditingPoints] = useState(false);
-    const [tempPoints, setTempPoints] = useState(maxPoints);
-    
-    const handlePointsEdit = () => {
-      setIsEditingPoints(true);
-      setTempPoints(maxPoints);
-    };
-
-    const handlePointsSave = () => {
-      const points = Math.max(1, Math.min(100, parseInt(tempPoints) || 1));
-      setMaxPoints(points);
-      setTempPoints(points);
-      setIsEditingPoints(false);
-    };
-
-    const handlePointsKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        handlePointsSave();
-      } else if (e.key === 'Escape') {
-        setIsEditingPoints(false);
-        setTempPoints(maxPoints);
-      }
-    };
-    
-    const filteredStudents = studentsForTimeSlot.filter(student => {
-      const nameMatch = student.name.toLowerCase().includes(searchName.toLowerCase());
-      const groupMatch = !searchGroup || student.group === searchGroup;
-      return nameMatch && groupMatch;
-    });
-    
-    return (
-      <div className="modal-overlay">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h2>Отметить посещаемость</h2>
-            <button 
-              className="close-button"
-              onClick={() => setShowStudentsList(false)}
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="students-list-container">
-            <div className="search-filters">
-              <div className="search-group">
-                <SearchInput value={searchName} onChange={setSearchName} />
-                <select
-                  value={searchGroup}
-                  onChange={(e) => setSearchGroup(e.target.value)}
-                  className="group-select"
-                >
-                  <option value="">Все группы</option>
-                  {uniqueGroups.map(group => (
-                    <option key={group} value={group}>{group}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="points-container" onClick={handlePointsEdit}>
-                <div className="points-label">Баллы за занятие:</div>
-                {isEditingPoints ? (
-                  <input
-                    type="number"
-                    className="points-input"
-                    value={tempPoints}
-                    onChange={(e) => setTempPoints(e.target.value)}
-                    onBlur={handlePointsSave}
-                    onKeyDown={handlePointsKeyDown}
-                    min="1"
-                    max="100"
-                    autoFocus
-                  />
-                ) : (
-                  <div className="points-value" title="Нажмите для редактирования">
-                    {maxPoints}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="students-table">
-              <div className="table-header">
-                <div className="header-cell">ФИО</div>
-                <div className="header-cell">Группа</div>
-                <div className="header-cell">Статус</div>
-              </div>
-              {filteredStudents.map(student => (
-                <div key={student.id} className="table-row">
-                  <div className="table-cell">{student.name}</div>
-                  <div className="table-cell">{student.group}</div>
-                  <div className="table-cell">
-                    <label className="attendance-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={selectedStudents.has(student.id)}
-                        onChange={(e) => {
-                          const newSelected = new Set(selectedStudents);
-                          if (e.target.checked) {
-                            newSelected.add(student.id);
-                          } else {
-                            newSelected.delete(student.id);
-                          }
-                          setSelectedStudents(newSelected);
-                        }}
-                      />
-                      <span className="checkmark"></span>
-                    </label>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="action-buttons">
-              <button 
-                className="cancel-button"
-                onClick={() => setShowStudentsList(false)}
-              >
-                Отмена
-              </button>
-              <button 
-                className="save-button"
-                onClick={handleSavePoints}
-                disabled={selectedStudents.size === 0}
-              >
-                Сохранить посещаемость
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const getDayName = (date) => {
     if (!(date instanceof Date)) return '';
     return date.toLocaleDateString('ru-RU', { weekday: 'short' });
@@ -922,7 +926,22 @@ const TeacherView = () => {
           </div>
         </div>
       </div>
-      {showStudentsList && <StudentsList />}
+      {showStudentsList && (
+        <StudentsList
+          searchName={searchName}
+          setSearchName={setSearchName}
+          searchGroup={searchGroup}
+          setSearchGroup={setSearchGroup}
+          originalStudents={originalStudents}
+          studentsForTimeSlot={studentsForTimeSlot}
+          setShowStudentsList={setShowStudentsList}
+          selectedStudents={selectedStudents}
+          setSelectedStudents={setSelectedStudents}
+          maxPoints={maxPoints}
+          setMaxPoints={setMaxPoints}
+          handleSavePoints={handleSavePoints}
+        />
+      )}
       {notification.show && (
         <div className="notification">
           {notification.message}
