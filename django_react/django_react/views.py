@@ -22,7 +22,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.contrib.auth import authenticate, login
 from leads.models import Teacher, Student, PointsHistory, Booking, Hall
-from leads.serializers import TeacherSerializer, StudentSerializer
+from leads.serializers import TeacherSerializer, StudentSerializer, HallSerializer
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 import os
@@ -490,13 +490,20 @@ HALLS = [
 @permission_classes([IsAuthenticated])
 def get_halls(request):
     try:
+        from leads.serializers import HallSerializer
+        
         date_str = request.GET.get('date')
         location = request.GET.get('location', 'gorny')
         
-        logger.info(f"Получен запрос на получение залов. Дата: {date_str}, Локация: {location}")
-        
         if not date_str:
             return Response({'error': 'Date parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Проверяем формат даты
+        try:
+            from datetime import datetime, time
+            parsed_date = datetime.strptime(date_str, '%Y-%m-%d')
+        except ValueError as e:
+            return Response({'error': 'Invalid date format'}, status=status.HTTP_400_BAD_REQUEST)
             
         location_mapping = {
             'gorny': 'Горный',
@@ -504,16 +511,9 @@ def get_halls(request):
         }
         location = location_mapping.get(location, location)
         
-        all_halls = Hall.objects.all()
-        logger.info(f"Всего залов в базе: {all_halls.count()}")
-        for hall in all_halls:
-            logger.info(f"Зал: {hall.name}, Локация: {hall.location.name if hall.location else 'Нет локации'}")
-        
         halls = Hall.objects.filter(location__name=location)
-        logger.info(f"Найдено залов для локации {location}: {halls.count()}")
         
         if not halls.exists():
-            logger.warning(f"Залы не найдены в базе данных для локации {location}. Используем дефолтные значения.")
             default_halls = [
                 {
                     'id': 1,
@@ -532,56 +532,13 @@ def get_halls(request):
                 }
             ]
             halls = default_halls
-        
-        hall_occupancy = {}
-        time_slots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20']
-        
-        for hall in halls:
-            hall_name = hall['name'] if isinstance(hall, dict) else hall.name
-            if hall_name not in hall_occupancy:
-                hall_occupancy[hall_name] = {time: 0 for time in time_slots}
-        
-        bookings = Booking.objects.filter(
-            date=date_str,
-            hall__location__name=location
-        )
-        logger.info(f"Найдено {bookings.count()} бронирований")
-        
-        for booking in bookings:
-            time_str = booking.time_slot.strftime('%H:%M')
-            if booking.hall.name in hall_occupancy and time_str in hall_occupancy[booking.hall.name]:
-                hall_occupancy[booking.hall.name][time_str] += 1
-                    
-        halls_data = []
-        for hall in halls:
-            hall_name = hall['name'] if isinstance(hall, dict) else hall.name
-            hall_max_capacity = hall['max_capacity'] if isinstance(hall, dict) else hall.capacity
-            hall_id = hall['id'] if isinstance(hall, dict) else hall.id
             
-            hall_data = {
-                'id': hall_id,
-                'name': hall_name,
-                'max_capacity': hall_max_capacity,
-                'timeSlotCapacity': {
-                    time: {
-                        'current': hall_occupancy[hall_name][time],  
-                        'max': hall_max_capacity
-                    } for time in time_slots
-                }
-            }
-            halls_data.append(hall_data)
-        
-        logger.info(f"Подготовлен ответ с {len(halls_data)} залами")
-        return Response({'halls': halls_data}, status=status.HTTP_200_OK)
+        # Используем сериализатор с контекстом даты
+        serializer = HallSerializer(halls, many=True, context={'date': parsed_date.date()})
+        return Response(serializer.data, status=status.HTTP_200_OK)
         
     except Exception as e:
-        logger.error(f"Ошибка при обработке запроса get_halls: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return Response(
-            {'error': f'Internal server error: {str(e)}'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

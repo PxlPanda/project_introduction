@@ -101,6 +101,10 @@ class HallViewSet(viewsets.ReadOnlyModelViewSet):
                 'belyaevo': []
             }
             
+            # Получаем дату из параметров запроса или используем текущую
+            date_param = request.query_params.get('date')
+            target_date = timezone.datetime.strptime(date_param, '%Y-%m-%d').date() if date_param else timezone.now().date()
+            
             # Получаем все залы
             halls = Hall.objects.select_related('location').all()
             print(f"Found {halls.count()} halls")
@@ -110,17 +114,20 @@ class HallViewSet(viewsets.ReadOnlyModelViewSet):
                 location_key = 'gorny' if hall.location.name == 'Горный' else 'belyaevo'
                 time_slots = self.get_time_slots(hall.location.name)
                 
-                # Получаем все бронирования для этого зала на сегодня
+                # Получаем все бронирования для этого зала на выбранную дату
                 bookings = Booking.objects.filter(
                     hall=hall,
-                    date=timezone.now().date()
+                    date=target_date
                 )
                 
                 # Создаем словарь занятости по временным слотам
                 time_slot_capacity = {}
                 for time_slot in time_slots:
-                    current_bookings = bookings.filter(time_slot=time_slot.split('-')[0]).count()
-                    time_slot_capacity[time_slot] = {
+                    start_time = time_slot.split('-')[0]
+                    # Преобразуем время в формат времени Python для корректного сравнения
+                    slot_time = timezone.datetime.strptime(start_time, '%H:%M').time()
+                    current_bookings = bookings.filter(time_slot=slot_time).count()
+                    time_slot_capacity[start_time] = {
                         'current': current_bookings,
                         'max': hall.capacity
                     }

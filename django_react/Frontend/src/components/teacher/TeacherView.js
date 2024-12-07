@@ -307,8 +307,298 @@ const TeacherView = () => {
     }));
   };
 
+  const styles = `
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      color: #1565c0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .close-button {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #424242;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background-color 0.2s;
+    }
+
+    .close-button:hover {
+      background-color: #f5f5f5;
+      color: #1976d2;
+    }
+
+    .students-list-container {
+      padding: 20px;
+      overflow-y: auto;
+      color: #212121;
+    }
+
+    .search-filters {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      gap: 20px;
+    }
+
+    .search-group {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .group-select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      min-width: 150px;
+      color: #424242;
+      background-color: white;
+    }
+
+    .points-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #e3f2fd;
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: 1px solid #90caf9;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .points-container:hover {
+      background: #bbdefb;
+      border-color: #64b5f6;
+    }
+
+    .points-label {
+      color: #1565c0;
+      font-weight: 500;
+    }
+
+    .points-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #1565c0;
+      min-width: 30px;
+      text-align: center;
+    }
+
+    .points-input {
+      font-size: 18px;
+      font-weight: bold;
+      color: #1565c0;
+      width: 60px;
+      text-align: center;
+      padding: 4px 8px;
+      border: 2px solid #1976d2;
+      border-radius: 4px;
+      background: white;
+    }
+
+    .points-input:focus {
+      outline: none;
+      border-color: #1565c0;
+      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+    }
+
+    .students-table {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: grid;
+      grid-template-columns: 2fr 1fr 100px;
+      background: #f5f5f5;
+      padding: 12px;
+      font-weight: 600;
+      color: #1565c0;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 100px;
+      padding: 12px;
+      border-top: 1px solid #ddd;
+      align-items: center;
+      color: #424242;
+    }
+
+    .table-row:hover {
+      background: #f8f8f8;
+    }
+
+    .attendance-checkbox {
+      display: block;
+      position: relative;
+      cursor: pointer;
+      font-size: 16px;
+      user-select: none;
+      width: 24px;
+      height: 24px;
+    }
+
+    .attendance-checkbox input {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+      height: 0;
+      width: 0;
+    }
+
+    .checkmark {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 24px;
+      width: 24px;
+      background-color: #fff;
+      border: 2px solid #1976d2;
+      border-radius: 4px;
+    }
+
+    .attendance-checkbox:hover input ~ .checkmark {
+      background-color: #e3f2fd;
+    }
+
+    .attendance-checkbox input:checked ~ .checkmark {
+      background-color: #1976d2;
+    }
+
+    .checkmark:after {
+      content: "";
+      position: absolute;
+      display: none;
+    }
+
+    .attendance-checkbox input:checked ~ .checkmark:after {
+      display: block;
+      left: 7px;
+      top: 3px;
+      width: 6px;
+      height: 12px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    .action-buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .save-button, .cancel-button {
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .save-button {
+      background: #1976d2;
+      color: white;
+      border: none;
+    }
+
+    .save-button:hover {
+      background: #1565c0;
+    }
+
+    .save-button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .cancel-button {
+      background: white;
+      color: #666;
+      border: 1px solid #ddd;
+    }
+
+    .cancel-button:hover {
+      background: #f5f5f5;
+    }
+  `;
+
+  const styleSheet = document.createElement("style");
+  styleSheet.type = "text/css";
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
+
   const StudentsList = () => {
     const uniqueGroups = [...new Set(studentsForTimeSlot.map(student => student.group))];
+    const [isEditingPoints, setIsEditingPoints] = useState(false);
+    const [tempPoints, setTempPoints] = useState(maxPoints);
+    
+    const handlePointsEdit = () => {
+      setIsEditingPoints(true);
+      setTempPoints(maxPoints);
+    };
+
+    const handlePointsSave = () => {
+      const points = Math.max(1, Math.min(100, parseInt(tempPoints) || 1));
+      setMaxPoints(points);
+      setTempPoints(points);
+      setIsEditingPoints(false);
+    };
+
+    const handlePointsKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        handlePointsSave();
+      } else if (e.key === 'Escape') {
+        setIsEditingPoints(false);
+        setTempPoints(maxPoints);
+      }
+    };
     
     const filteredStudents = studentsForTimeSlot.filter(student => {
       const nameMatch = student.name.toLowerCase().includes(searchName.toLowerCase());
@@ -317,220 +607,102 @@ const TeacherView = () => {
     });
     
     return (
-      <div className="modal-overlay" style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div className="modal-content" style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          maxWidth: '800px',
-          width: '95%',
-          height: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          color: '#333'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ margin: 0, color: '#333' }}>Поиск студентов</h2>
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h2>Отметить посещаемость</h2>
             <button 
+              className="close-button"
               onClick={() => setShowStudentsList(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '20px',
-                cursor: 'pointer',
-                padding: '5px',
-                color: '#666'
-              }}
             >
               ×
             </button>
           </div>
-          
-          <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <SearchInput 
-            value={searchName}
-            onChange={setSearchName}
-          />
-            <select
-              value={searchGroup}
-              onChange={(e) => setSearchGroup(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-            >
-              <option value="">Все группы</option>
-              {uniqueGroups.map(group => (
-                <option key={group} value={group}>{group}</option>
-              ))}
-            </select>
-          </div>
 
-          <div style={{ 
-            flex: 1, 
-            overflowY: 'auto',
-            marginBottom: '20px',
-            backgroundColor: '#fff',
-            borderRadius: '4px',
-            boxShadow: 'inset 0 0 5px rgba(0,0,0,0.1)'
-          }}>
-            {getSortedStudents().map((student, index) => (
-              <div key={student.id} style={{
-                padding: '15px',
-                borderBottom: '1px solid #eee',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '15px',
-                backgroundColor: selectedStudents.has(student.id) ? '#f5f5f5' : 'white'
-              }}>
-                <div style={{ flex: 0.5 }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedStudents.has(student.id)}
-                    onChange={(e) => {
-                      const newSelected = new Set(selectedStudents);
-                      if (e.target.checked) {
-                        newSelected.add(student.id);
-                      } else {
-                        newSelected.delete(student.id);
-                      }
-                      setSelectedStudents(newSelected);
-                    }}
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      cursor: 'pointer'
-                    }}
-                  />
-                </div>
-                <div style={{ flex: 2 }}>
-                  <div style={{ fontWeight: 'bold' }}>{student.name}</div>
-                  <div style={{ fontSize: '14px', color: '#666' }}>{student.group}</div>
-                </div>
-                <div style={{ flex: 2 }}>
-                  <input
-                    type="text"
-                    placeholder="Причина начисления баллов"
-                    value={pointsReasons[student.id] || ''}
-                    onChange={(e) => {
-                      handleReasonChange(student.id, e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        const pointsInput = document.querySelector(`#points-${student.id}`);
-                        if (pointsInput) pointsInput.focus();
-                      }
-                      if (e.key === 'ArrowDown' && index < studentsForTimeSlot.length - 1) {
-                        const nextInput = document.querySelector(`#reason-${studentsForTimeSlot[index + 1].id}`);
-                        if (nextInput) nextInput.focus();
-                      }
-                      if (e.key === 'ArrowUp' && index > 0) {
-                        const prevInput = document.querySelector(`#reason-${studentsForTimeSlot[index - 1].id}`);
-                        if (prevInput) prevInput.focus();
-                      }
-                    }}
-                    id={`reason-${student.id}`}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="students-list-container">
+            <div className="search-filters">
+              <div className="search-group">
+                <SearchInput value={searchName} onChange={setSearchName} />
+                <select
+                  value={searchGroup}
+                  onChange={(e) => setSearchGroup(e.target.value)}
+                  className="group-select"
+                >
+                  <option value="">Все группы</option>
+                  {uniqueGroups.map(group => (
+                    <option key={group} value={group}>{group}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="points-container" onClick={handlePointsEdit}>
+                <div className="points-label">Баллы за занятие:</div>
+                {isEditingPoints ? (
                   <input
                     type="number"
-                    min="0"
-                    max={maxPoints}
-                    value={selectedPoints[student.id] || 0}
-                    onChange={(e) => handlePointsChange(student.id, parseInt(e.target.value) || 0)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === 'ArrowDown') {
-                        if (index < studentsForTimeSlot.length - 1) {
-                          const nextReasonInput = document.querySelector(`#reason-${studentsForTimeSlot[index + 1].id}`);
-                          if (nextReasonInput) nextReasonInput.focus();
-                        }
-                      }
-                      if (e.key === 'ArrowUp' && index > 0) {
-                        const prevReasonInput = document.querySelector(`#reason-${studentsForTimeSlot[index - 1].id}`);
-                        if (prevReasonInput) prevReasonInput.focus();
-                      }
-                    }}
-                    id={`points-${student.id}`}
-                    style={{
-                      width: '60px',
-                      padding: '8px',
-                      border: selectedPoints[student.id] ? '2px solid #1976d2' : '1px solid #ddd',
-                      borderRadius: '4px',
-                      textAlign: 'center',
-                      backgroundColor: selectedPoints[student.id] ? '#e3f2fd' : 'white'
-                    }}
+                    className="points-input"
+                    value={tempPoints}
+                    onChange={(e) => setTempPoints(e.target.value)}
+                    onBlur={handlePointsSave}
+                    onKeyDown={handlePointsKeyDown}
+                    min="1"
+                    max="100"
+                    autoFocus
                   />
-                  <span style={{ color: '#666' }}>/ </span>
-                  {student.id === studentsForTimeSlot[0]?.id ? (
-                    <input
-                      type="number"
-                      min="1"
-                      value={maxPoints}
-                      onChange={(e) => setMaxPoints(parseInt(e.target.value) || 1)}
-                      style={{
-                        width: '60px',
-                        padding: '8px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        textAlign: 'center'
-                      }}
-                    />
-                  ) : (
-                    <span style={{ color: '#666' }}>{maxPoints}</span>
-                  )}
-                </div>
+                ) : (
+                  <div className="points-value" title="Нажмите для редактирования">
+                    {maxPoints}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-            <button
-              onClick={() => setShowStudentsList(false)}
-              style={{
-                padding: '8px 16px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                background: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Отмена
-            </button>
-            <button
-              onClick={handleSavePoints}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '4px',
-                backgroundColor: '#1976d2',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Сохранить
-            </button>
+            <div className="students-table">
+              <div className="table-header">
+                <div className="header-cell">ФИО</div>
+                <div className="header-cell">Группа</div>
+                <div className="header-cell">Статус</div>
+              </div>
+              {filteredStudents.map(student => (
+                <div key={student.id} className="table-row">
+                  <div className="table-cell">{student.name}</div>
+                  <div className="table-cell">{student.group}</div>
+                  <div className="table-cell">
+                    <label className="attendance-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.has(student.id)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedStudents);
+                          if (e.target.checked) {
+                            newSelected.add(student.id);
+                          } else {
+                            newSelected.delete(student.id);
+                          }
+                          setSelectedStudents(newSelected);
+                        }}
+                      />
+                      <span className="checkmark"></span>
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="action-buttons">
+              <button 
+                className="cancel-button"
+                onClick={() => setShowStudentsList(false)}
+              >
+                Отмена
+              </button>
+              <button 
+                className="save-button"
+                onClick={handleSavePoints}
+                disabled={selectedStudents.size === 0}
+              >
+                Сохранить посещаемость
+              </button>
+            </div>
           </div>
         </div>
       </div>

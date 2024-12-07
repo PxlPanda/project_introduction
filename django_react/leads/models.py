@@ -117,10 +117,14 @@ class Booking(models.Model):
     marked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        indexes = [
+            models.Index(fields=['date', 'status']),
+            models.Index(fields=['time_slot']),
+        ]
         unique_together = ['hall', 'date', 'time_slot', 'student']
 
     def __str__(self):
-        return f"{self.student.user.full_name} - {self.hall.name} - {self.date} {self.time_slot}"
+        return f"{self.student.user.full_name} - {self.hall.name} ({self.date} {self.time_slot}) [{self.status}]"
 
 class PointsHistory(models.Model):
     POINTS_TYPE_CHOICES = [

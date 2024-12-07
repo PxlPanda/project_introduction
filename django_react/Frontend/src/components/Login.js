@@ -152,6 +152,7 @@ const Login = ({ onLogin }) => {
           password: formValue.password,
           student_number: formValue.studentNumber,
           group_name: formValue.groupName,
+          full_name: formValue.fullName,
           user_type: 'student'
         } : {
           full_name: formValue.fullName,

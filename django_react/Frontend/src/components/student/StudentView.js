@@ -182,13 +182,21 @@ const StudentView = () => {
   
     return bookings.some(booking => {
       // Проверяем совпадение даты
-      const bookingDate = booking.date;
-      const compareDate = selectedDate;
+      const bookingDate = new Date(booking.date);
+      const compareDate = new Date(selectedDate);
       
-      const isSameDate = 
-        bookingDate.getFullYear() === compareDate.getFullYear() &&
-        bookingDate.getMonth() === compareDate.getMonth() &&
-        bookingDate.getDate() === compareDate.getDate();
+      // Устанавливаем время в полночь по UTC для обеих дат
+      bookingDate.setHours(0, 0, 0, 0);
+      compareDate.setHours(0, 0, 0, 0);
+      
+      console.log('Checking conflict:', {
+        bookingDate: bookingDate.toISOString(),
+        compareDate: compareDate.toISOString(),
+        bookingTime: booking.time,
+        compareTime: time
+      });
+      
+      const isSameDate = bookingDate.getTime() === compareDate.getTime();
   
       if (!isSameDate) {
         return false;
@@ -260,7 +268,8 @@ const StudentView = () => {
       }
   
       const locationName = selectedLocation === 'gorny' ? 'Горный' : 'Беляево';
-      const formattedDate = selectedDate.toISOString().split('T')[0];
+      // Используем локальную дату без преобразования в UTC
+      const formattedDate = new Date(selectedDate).toLocaleDateString('en-CA');
   
       const response = await fetch(
         `http://127.0.0.1:8000/leads/halls/?location=${encodeURIComponent(locationName)}&date=${formattedDate}`,
@@ -278,22 +287,34 @@ const StudentView = () => {
       }
   
       const data = await response.json();
-      
+      console.log('Raw halls response:', data);
+      console.log('First hall example:', data[0]);
+    
       // Преобразуем данные в нужный формат
-      // В функции fetchHalls измените эту часть:
-      const formattedHalls = data.map(hall => ({
-        id: hall.id,
-        name: hall.name,
-        capacity: hall.capacity,
-        timeSlotCapacity: TIME_SLOTS[selectedLocation].reduce((acc, time) => {
-          const bookingsForTime = hall.bookings?.filter(b => b.time_slot === time) || [];
-          acc[time] = {
-            current: bookingsForTime.length,
-            max: hall.capacity
-          };
-          return acc;
-        }, {})
-      }));
+      const timeSlots = TIME_SLOTS[selectedLocation];
+      console.log('Time slots for location:', selectedLocation, timeSlots);
+      const formattedHalls = data.map(hall => {
+        console.log('Processing hall:', hall);
+        console.log('Raw timeSlotCapacity:', hall.timeSlotCapacity);
+        const formatted = {
+          id: hall.id,
+          name: hall.name,
+          capacity: hall.capacity,
+          timeSlotCapacity: timeSlots.reduce((acc, time) => {
+            console.log('Processing time slot:', time, hall.timeSlotCapacity[time]);
+            const current = hall.timeSlotCapacity[time]?.current;
+            acc[time] = {
+              current: current !== undefined ? Math.max(0, current) : 0,
+              max: hall.capacity
+            };
+            return acc;
+          }, {})
+        };
+        console.log('Formatted hall:', formatted);
+        return formatted;
+      });
+  
+      console.log('Final formatted halls:', formattedHalls);
   
       // Обновляем состояние, сохраняя предыдущие данные для другой локации
       setHalls(prev => ({
@@ -345,8 +366,9 @@ const StudentView = () => {
       }
       
       const bookingDate = new Date(selectedDate);
-      const dateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
-      bookingDate.setUTCHours(0, 0, 0, 0);
+      bookingDate.setHours(0, 0, 0, 0);
+      // Форматируем дату в YYYY-MM-DD, используя локальное время
+      const dateStr = bookingDate.toLocaleDateString('en-CA'); // en-CA даёт формат YYYY-MM-DD
       
       const response = await fetch('http://127.0.0.1:8000/leads/bookings/', {
         method: 'POST',
@@ -357,7 +379,7 @@ const StudentView = () => {
         body: JSON.stringify({
           hall_id: hallId,
           date: dateStr,
-          time_slot: selectedTimes[hallId],
+          time_slot: normalizeTime(selectedTimes[hallId]),
           location: selectedLocation === 'gorny' ? 'Горный' : 'Беляево'
         })
       });
@@ -368,7 +390,9 @@ const StudentView = () => {
       }
 
       // После успешного создания записи обновляем данные
-      await Promise.all([fetchBookings(), fetchHalls()]);
+      await fetchHalls();
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await fetchBookings();
       
       setSelectedTimes(prev => ({ ...prev, [hallId]: null }));
       showNotification('Запись успешно создана');
@@ -393,7 +417,9 @@ const StudentView = () => {
         return;
       }
   
-      const formattedDate = selectedDate.toISOString().split('T')[0];
+      const bookingDate = new Date(selectedDate);
+      bookingDate.setHours(0, 0, 0, 0);
+      const formattedDate = bookingDate.toLocaleDateString('en-CA');
       console.log('Fetching halls for date:', formattedDate);
   
       const response = await fetch(
@@ -452,16 +478,14 @@ const StudentView = () => {
       }
   
       const formattedBookings = data.bookings.map(booking => {
-        // Создаем дату в локальной временной зоне
-        const [year, month, day] = booking.date.split('-').map(Number);
-        const date = new Date(year, month - 1, day, 12); // добавляем 12 часов, чтобы избежать проблем с часовым поясом
-        
+        const date = new Date(booking.date);
+        date.setHours(0, 0, 0, 0);
         return {
-          id: booking.id,
-          hall: booking.hall.name,
-          location: booking.location,
-          date: date,
-          time: booking.time_slot
+            id: booking.id,
+            hall: booking.hall.name,
+            location: booking.location,
+            date: date,
+            time: booking.time_slot
         };
       });
       
@@ -515,7 +539,9 @@ const StudentView = () => {
         });
       }
       
-      setBookings(prev => prev.filter(b => b.id !== bookingId));
+      await fetchHalls();
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await fetchBookings();
       
       setNotification({
         show: true,
@@ -858,6 +884,7 @@ useEffect(() => {
         
         // Получаем новые данные
         await fetchHalls();
+        await new Promise(resolve => setTimeout(resolve, 100));
         await fetchBookings();
         
         // Если данные изменились, React автоматически обновит UI

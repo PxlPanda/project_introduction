@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Student, Teacher, Location, Hall, PinnedHall, Booking, PointsHistory
+from datetime import datetime
+import traceback
 
 User = get_user_model()
 
@@ -41,29 +43,49 @@ class HallSerializer(serializers.ModelSerializer):
 
     def get_timeSlotCapacity(self, obj):
         date = self.context.get('date')
+        print(f"Debug: Получена дата из контекста: {date}")
         if not date:
             return {}
 
-        # Стандартные временные слоты
+        # Правильные временные слоты
         time_slots = {
-            '10:00': {'current': 0, 'max': obj.capacity},
-            '12:00': {'current': 0, 'max': obj.capacity},
-            '14:00': {'current': 0, 'max': obj.capacity},
-            '16:00': {'current': 0, 'max': obj.capacity},
-            '18:00': {'current': 0, 'max': obj.capacity}
+            '9:00': {'current': 0, 'max': obj.capacity},
+            '10:50': {'current': 0, 'max': obj.capacity},
+            '12:40': {'current': 0, 'max': obj.capacity},
+            '14:30': {'current': 0, 'max': obj.capacity},
+            '16:30': {'current': 0, 'max': obj.capacity},
+            '18:20': {'current': 0, 'max': obj.capacity}
         }
 
         try:
             # Получаем количество бронирований для каждого временного слота
             for time_slot in time_slots.keys():
-                bookings_count = obj.bookings.filter(
+                print(f"Debug: Проверяем слот {time_slot}")
+                # Преобразуем строку времени в объект time
+                time_obj = datetime.strptime(time_slot, '%H:%M').time()
+                print(f"Debug: time_obj = {time_obj}")
+                
+                bookings = obj.bookings.filter(
                     date=date,
-                    time_slot=time_slot
-                ).count()
+                    time_slot=time_obj,
+                    status__in=['PENDING', 'PRESENT']
+                )
+                print(f"Debug: SQL запрос: {bookings.query}")
+                
+                # Получаем все бронирования для отладки
+                all_bookings = obj.bookings.all()
+                print("Debug: Все бронирования для этого зала:")
+                for booking in all_bookings:
+                    print(f"  - date={booking.date}, time_slot={booking.time_slot}, status={booking.status}")
+                
+                bookings_count = bookings.count()
+                print(f"Debug: Найдено бронирований для слота {time_slot}: {bookings_count}")
                 time_slots[time_slot]['current'] = bookings_count
+
         except Exception as e:
             print(f"Error counting bookings: {str(e)}")
-            # В случае ошибки возвращаем пустые слоты
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return time_slots
 
         return time_slots

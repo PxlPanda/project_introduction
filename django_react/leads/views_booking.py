@@ -21,8 +21,22 @@ def booking_view(request):
             # Получаем студента по текущему пользователю
             student = Student.objects.get(user=request.user)
             
-            # Получаем все записи студента
+            # Получаем дату из параметров запроса
+            date_str = request.GET.get('date')
+            
+            # Базовый запрос бронирований
             bookings = Booking.objects.filter(student=student).select_related('hall', 'hall__location')
+            
+            # Если указана дата, фильтруем по ней
+            if date_str:
+                try:
+                    date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    bookings = bookings.filter(date=date)
+                except ValueError:
+                    return Response(
+                        {'error': 'Invalid date format. Use YYYY-MM-DD'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             
             # Форматируем данные для ответа
             bookings_data = []
