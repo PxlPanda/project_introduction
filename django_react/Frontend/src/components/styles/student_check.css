@@ -1,0 +1,153 @@
+.table-cell {
+    padding: 8px;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.table-header {
+    display: grid;
+    grid-template-columns: 2fr 80px 1fr 80px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    align-items: center;
+}
+
+.search-filters {
+    margin-bottom: 20px;
+}
+
+.search-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.group-filter {
+    width: 200px;
+}
+
+.group-select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 14px;
+}
+
+.group-select:hover {
+    border-color: #aaa;
+}
+
+.group-select:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 2px rgba(0,102,204,0.2);
+}
+
+.time-info {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.points-info {
+    white-space: nowrap;
+}
+
+.table-container {
+    position: relative;
+    width: 100%;
+}
+
+.students-table {
+    width: 100%;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 2fr 80px 1fr 80px;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+}
+
+.status {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+}
+
+.actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.attendance-checkbox {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+}
+
+.delete-button {
+    background: none;
+    border: none;
+    color: #ff4444;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.delete-button:hover {
+    background-color: rgba(255, 68, 68, 0.1);
+}
+
+.delete-button.disabled {
+    color: #ccc;
+    cursor: not-allowed;
+}
+
+.delete-button.disabled:hover {
+    background: none;
+}
+
+.time-info {
+    color: #666;
+    font-size: 14px;
+}
+
+.time-info.available {
+    color: #28a745;
+}
+
+.time-info.unavailable {
+    color: #dc3545;
+}
+
+.auto-delete-timer {
+    color: #dc3545;
+    font-size: 14px;
+    white-space: nowrap;
+    margin-left: auto;
+    margin-right: 20px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.auto-delete-timer {
+    color: #dc3545;
+    font-size: 14px;
+    white-space: nowrap;
+    margin-left: auto;
+    margin-right: 20px;
+}

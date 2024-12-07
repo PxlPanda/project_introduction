@@ -440,3 +440,73 @@ def get_booked_students(request):
             {'error': 'Произошла ошибка при получении списка студентов'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_points(request):
+    try:
+        students_points = request.data.get('students_points', [])
+        time_slot_id = request.data.get('time_slot_id')  # Добавляем получение time_slot_id
+        teacher = Teacher.objects.get(user=request.user)
+        
+        updated_students = []
+        for student_point in students_points:
+            student_id = student_point['student_id']
+            points = student_point['points']
+            reason = student_point['reason']
+            
+            student = Student.objects.get(id=student_id)
+            
+            # Находим бронирование для данного студента и временного слота
+            try:
+                booking = Booking.objects.get(
+                    student=student,
+                    time_slot_id=time_slot_id,
+                    date__date=timezone.now().date()
+                )
+            except Booking.DoesNotExist:
+                continue  # Пропускаем студента, если для него нет бронирования на это время
+            
+            # Проверяем, не были ли уже начислены баллы за это занятие
+            existing_points = PointsHistory.objects.filter(
+                student=student,
+                awarded_by=teacher,
+                date__date=timezone.now().date(),
+                booking=booking
+            ).exists()
+            
+            if existing_points:
+                continue  # Пропускаем этого студента, если баллы уже начислены
+            
+            # Создаем запись о баллах
+            PointsHistory.objects.create(
+                student=student,
+                points=points,
+                reason=reason,
+                awarded_by=teacher,
+                points_type='MANUAL',
+                booking=booking,
+                date=timezone.now()
+            )
+            
+            # Обновляем общую сумму баллов студента
+            total_points = PointsHistory.objects.filter(student=student).aggregate(models.Sum('points'))['points__sum'] or 0
+            student.points = total_points
+            student.save()
+            
+            updated_students.append({
+                'student_id': student_id,
+                'points': total_points
+            })
+        
+        return Response({
+            'status': 'success',
+            'message': 'Баллы успешно сохранены',
+            'updated_students': updated_students
+        })
+        
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)

@@ -7,6 +7,7 @@ import '../styles/hall-card.css';
 import '../styles/buttons.css';
 import '../styles/header.css';
 import '../styles/calendar.css';
+import axios from 'axios';
 
 const SearchInput = React.memo(({ value, onChange }) => {
   const handleChange = useCallback((e) => {
@@ -30,6 +31,7 @@ const SearchInput = React.memo(({ value, onChange }) => {
   );
 });
 
+const AUTO_DELETE_DELAY = 25 * 60 * 1000; // 25 минут в миллисекундах
 const StudentsList = React.memo(({ 
   searchName, 
   setSearchName, 
@@ -42,12 +44,66 @@ const StudentsList = React.memo(({
   setSelectedStudents,
   maxPoints,
   setMaxPoints,
-  handleSavePoints
+  handleSavePoints,
+  timeSlot,
+  canDelete,
 }) => {
   const uniqueGroups = [...new Set(originalStudents.map(student => student.group))];
   const [isEditingPoints, setIsEditingPoints] = useState(false);
   const [tempPoints, setTempPoints] = useState(maxPoints);
   
+  useEffect(() => {
+    if (!timeSlot || !studentsForTimeSlot.length || !canDelete) return;
+  
+    const lectureStartTime = new Date(timeSlot.start_time);
+    const now = new Date();
+    const timeSinceStart = now - lectureStartTime;
+    
+    if (timeSinceStart >= 0 && timeSinceStart < AUTO_DELETE_DELAY) {
+      const timeoutId = setTimeout(async () => {
+        // Получаем список неотмеченных студентов
+        const unmarkedStudents = studentsForTimeSlot.filter(
+          student => !selectedStudents.has(student.id)
+        );
+  
+        // Удаляем каждого неотмеченного студента
+        for (const student of unmarkedStudents) {
+          try {
+            await axios.delete(`/api/bookings/${student.id}/`);
+            console.log(`Автоматически удалена запись студента ${student.name}`);
+          } catch (error) {
+            console.error(`Ошибка при удалении записи студента ${student.id}:`, error);
+          }
+        }
+  
+        // Обновляем список студентов
+        window.location.reload(); // Перезагружаем страницу для обновления данных
+  
+      }, AUTO_DELETE_DELAY - timeSinceStart);
+  
+      return () => clearTimeout(timeoutId);
+    }
+  }, [timeSlot, studentsForTimeSlot, selectedStudents, canDelete]);
+
+  const getRemainingTime = () => {
+    if (!timeSlot) return '';
+    
+    const lectureStartTime = new Date(timeSlot.start_time);
+    const now = new Date();
+    const timeSinceStart = now - lectureStartTime;
+    
+    if (timeSinceStart < 0) {
+      return 'Пара еще не началась';
+    }
+    
+    if (timeSinceStart >= AUTO_DELETE_DELAY) {
+      return 'Время автоудаления истекло';
+    }
+    
+    const remainingTime = Math.ceil((AUTO_DELETE_DELAY - timeSinceStart) / 60000); // в минутах
+    return `До автоудаления: ${remainingTime} мин`;
+  };
+
   const handlePointsEdit = () => {
     setIsEditingPoints(true);
     setTempPoints(maxPoints);
@@ -74,14 +130,16 @@ const StudentsList = React.memo(({
       <div className="modal-content">
         <div className="modal-header">
           <h2>Отметить посещаемость</h2>
+          <div className="auto-delete-timer">
+            {getRemainingTime()}
+          </div>
           <button 
             className="close-button"
             onClick={() => setShowStudentsList(false)}
           >
-            ×
+            ✕
           </button>
         </div>
-
         <div className="students-list-container">
           <div className="search-filters">
             <div className="search-group">
@@ -202,6 +260,22 @@ const TeacherView = () => {
   const [awardingPoints, setAwardingPoints] = useState(false);
   const searchInputRef = useRef(null);
   const [originalStudents, setOriginalStudents] = useState([]);
+  const [canDelete, setCanDelete] = useState(false);
+
+  const checkCanDelete = useCallback(() => {
+    if (!selectedTimeSlot) {
+      setCanDelete(false);
+      return;
+    }
+
+    const now = new Date();
+    const lectureTime = new Date(selectedTimeSlot.start_time);
+    const timeDiff = now - lectureTime;
+    
+    // Разрешаем удаление за 30 минут до начала пары и до истечения AUTO_DELETE_DELAY
+    const canDeleteNow = timeDiff >= -30 * 60 * 1000 && timeDiff < AUTO_DELETE_DELAY;
+    setCanDelete(canDeleteNow);
+  }, [selectedTimeSlot]);
 
   const fetchStudents = async (hall, timeSlot) => {
     try {
@@ -259,8 +333,16 @@ const TeacherView = () => {
       hall,
       selectedTime
     });
+    setSelectedTimeSlot(selectedTime);
     fetchStudents(hall, selectedTime);
   };
+
+  useEffect(() => {
+    checkCanDelete();
+    const interval = setInterval(checkCanDelete, 60000);
+    return () => clearInterval(interval);
+  }, [checkCanDelete]);
+
 
   useEffect(() => {
     if (showStudentsList) {
@@ -363,19 +445,29 @@ const TeacherView = () => {
     }));
   };
 
-  const handleSavePoints = async () => {
+  const handleSavePointsClick = async () => {
     try {
       setIsLoading(true);
-      const studentsToUpdate = Object.entries(selectedPoints).map(([studentId, points]) => ({
-        student_id: parseInt(studentId),
-        points: points,
-        reason: pointsReasons[studentId] || ''
-      })).filter(item => item.points > 0 && item.reason);
+      
+      const selectedStudentIds = Array.from(selectedStudents);
   
-      if (studentsToUpdate.length === 0) {
-        alert('Нет баллов для сохранения');
+      if (selectedStudentIds.length === 0) {
+        alert('Не выбраны студенты для начисления баллов');
         return;
       }
+      
+      console.log('selectedTimeSlot:', selectedTimeSlot);
+  
+      if (!selectedTimeSlot) {
+        alert('Не выбрано время занятия');
+        return;
+      }
+  
+      const studentsToUpdate = selectedStudentIds.map(studentId => ({
+        student_id: parseInt(studentId),
+        points: maxPoints,
+        reason: 'Посещение занятия'
+      }));
   
       const response = await fetch('/api/save-points/', {
         method: 'POST',
@@ -384,7 +476,8 @@ const TeacherView = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          students_points: studentsToUpdate
+          students_points: studentsToUpdate,
+          time_slot_id: selectedTimeSlot.id
         })
       });
   
@@ -392,14 +485,29 @@ const TeacherView = () => {
         throw new Error('Ошибка сохранения баллов');
       }
   
+      const data = await response.json();
+      if (data.updated_students) {
+        const updatedStudentsMap = new Map(data.updated_students.map(s => [s.student_id, s]));
+        setStudentsForTimeSlot(prevStudents => 
+          prevStudents.map(student => ({
+            ...student,
+            points: updatedStudentsMap.get(student.id)?.points || student.points
+          }))
+        );
+        
+        // Добавляем отправку события после успешного обновления
+        window.dispatchEvent(new CustomEvent('student-points-updated', {
+          detail: {
+            updatedStudents: data.updated_students
+          }
+        }));
+      }
+  
       alert('Баллы успешно сохранены');
-      setSelectedPoints({});
-      setPointsReasons({});
       setShowStudentsList(false);
-      
     } catch (error) {
       console.error('Error saving points:', error);
-      alert('Не удалось сохранить баллы');
+      alert(error.message || 'Произошла ошибка при сохранении баллов');
     } finally {
       setIsLoading(false);
     }
@@ -939,7 +1047,9 @@ const TeacherView = () => {
           setSelectedStudents={setSelectedStudents}
           maxPoints={maxPoints}
           setMaxPoints={setMaxPoints}
-          handleSavePoints={handleSavePoints}
+          handleSavePoints={handleSavePointsClick}
+          timeSlot={selectedTimeSlot}
+          canDelete={canDelete}
         />
       )}
       {notification.show && (

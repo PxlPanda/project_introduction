@@ -21,6 +21,7 @@ urlpatterns = [
     path('bookings/', booking_view, name='booking_view'),
     path('bookings/<int:booking_id>/', booking_detail_view, name='booking_detail'),
     path('student-data/', views.student_data, name='student-data'), 
-    path('server-time/', views.server_time, name='server-time'),    
+    path('server-time/', views.server_time, name='server-time'),
+    path('save-points/', views.save_points, name='save-points'),    
 
 ]

@@ -180,8 +180,8 @@ const StudentView = () => {
   const checkTimeConflict = useCallback((time) => {
     if (!bookings.length) return false;
   
-    return bookings.some(booking => {
-      // Проверяем совпадение даты
+    // Сначала фильтруем бронирования по дате
+    const relevantBookings = bookings.filter(booking => {
       const bookingDate = new Date(booking.date);
       const compareDate = new Date(selectedDate);
       
@@ -189,25 +189,15 @@ const StudentView = () => {
       bookingDate.setHours(0, 0, 0, 0);
       compareDate.setHours(0, 0, 0, 0);
       
-      console.log('Checking conflict:', {
-        bookingDate: bookingDate.toISOString(),
-        compareDate: compareDate.toISOString(),
-        bookingTime: booking.time,
-        compareTime: time
-      });
-      
-      const isSameDate = bookingDate.getTime() === compareDate.getTime();
+      return bookingDate.getTime() === compareDate.getTime();
+    });
   
-      if (!isSameDate) {
-        return false;
-      }
-  
-      // Получаем номера пар и сравниваем их
+    // Затем проверяем конфликты только для отфильтрованных бронирований
+    return relevantBookings.some(booking => {
       const currentLessonNumber = getLessonNumber(time, selectedLocation);
       const bookingLocation = booking.location.toLowerCase() === 'горный' ? 'gorny' : 'belyaevo';
       const bookingLessonNumber = getLessonNumber(booking.time, bookingLocation);
   
-      // Теперь просто сравниваем номера пар, игнорируя локацию
       return currentLessonNumber === bookingLessonNumber;
     });
   }, [bookings, selectedDate, selectedLocation]);
@@ -533,8 +523,7 @@ const StudentView = () => {
     }
   };
 
-  // Функция fetchStudentProfile
-  const fetchStudentProfile = async () => {
+  const fetchStudentProfile = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -543,8 +532,7 @@ const StudentView = () => {
         return;
       }
   
-      console.log('Fetching student profile with token:', token);
-      const response = await fetch('http://127.0.0.1:8000/leads/student-data/', {
+      const response = await fetch('/leads/student-data/', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -564,19 +552,10 @@ const StudentView = () => {
       }
   
       const data = await response.json();
-      console.log('Received student data:', data);  // Смотрим, что приходит
-
-      // Добавим больше логов для отладки
-      console.log('Setting student name:', data.full_name);
-      console.log('Setting student group:', data.group);
-      console.log('Setting student id:', data.student_id);
-  
-      // Устанавливаем данные в отдельные состояния
       setStudentName(data.full_name || 'Не указано');
       setStudentGroup(data.group_name || 'Не указана');
-      setStudentId(data.student_number|| 'Не указан');
-  
-      // Устанавливаем историю баллов и текущие баллы
+      setStudentId(data.student_number?.toString() || 'Не указан');
+      setCurrentPoints(data.points || 0);
       setPointsHistory(data.points_history?.map(record => ({
         id: record.id,
         date: new Date(record.date).toLocaleString(),
@@ -585,17 +564,49 @@ const StudentView = () => {
         type: record.type,
         awardedBy: record.awarded_by
       })) || []);
-      setCurrentPoints(data.current_points || 0);
+  
     } catch (error) {
       console.error('Error fetching student data:', error);
-      // В случае ошибки устанавливаем значения по умолчанию
-      setStudentName('Не указано');
-      setStudentGroup('Не указана');
-      setStudentId('Не указан');
-      setPointsHistory([]);
-      setCurrentPoints(0);
+    }
+  }, []); // Пустой массив зависимостей, так как функция не зависит от пропсов или состояния
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchStudentProfile();
+    }, 1000); // Задержка в 1 секунду
+  
+    return () => clearTimeout(timer);
+  }, [fetchStudentProfile]);
+
+// 2. Улучшить обработчик события обновления баллов
+useEffect(() => {
+  const handlePointsUpdate = (event) => {
+    console.log('Received points update event:', event);
+    const { detail } = event;
+    
+    if (detail && detail.updatedStudents) {
+      // Ищем обновление для текущего студента, сравниваем как числа
+      const currentStudent = detail.updatedStudents.find(
+        student => Number(student.student_id) === Number(studentId)
+      );
+      
+      if (currentStudent) {
+        console.log('Updating points for current student:', currentStudent);
+        setCurrentPoints(Number(currentStudent.points));
+        // Обновляем весь профиль для получения актуальной истории
+        fetchStudentProfile();
+      }
     }
   };
+
+  // Добавляем слушатель события
+  window.addEventListener('student-points-updated', handlePointsUpdate);
+
+  // Удаляем слушатель при размонтировании
+  return () => {
+    window.removeEventListener('student-points-updated', handlePointsUpdate);
+  };
+}, [studentId, fetchStudentProfile]);
 
 const fetchServerTime = async () => {
   try {
@@ -889,6 +900,47 @@ useEffect(() => {
     }, timeUntilMidnight);
   
     return () => clearTimeout(timer);
+  }, []);
+
+  // Добавляем useEffect для обновления данных студента
+  useEffect(() => {
+  // Немедленный первый вызов
+  fetchStudentProfile();
+  
+  // Периодическое обновление каждые 300мс
+  const timer = setInterval(() => {
+    fetchStudentProfile();
+  }, 300);
+
+  return () => clearInterval(timer);
+}, [fetchStudentProfile]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchStudentProfile();
+      }
+    };
+  
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePointsUpdate = async (event) => {
+      console.log('Получено событие обновления баллов');
+      await fetchStudentProfile();
+    };
+  
+    window.addEventListener('student-points-updated', handlePointsUpdate);
+    
+    // Очистка при размонтировании
+    return () => {
+      window.removeEventListener('student-points-updated', handlePointsUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -1297,7 +1349,7 @@ useEffect(() => {
               <div style={{ width: '100%', height: '8px', backgroundColor: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
                 <div 
                   style={{ 
-                    width: `${userData?.points || 0}%`, 
+                    width: `${Math.min((currentPoints / 100) * 100, 100)}%`, 
                     height: '100%', 
                     background: `
                       linear-gradient(45deg, 
