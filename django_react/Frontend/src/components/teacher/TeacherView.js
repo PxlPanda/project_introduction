@@ -57,31 +57,67 @@ const TeacherView = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef(null);
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (hall, timeSlot) => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/students/', {
+      
+      // Учитываем часовой пояс при форматировании даты
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const date = `${year}-${month}-${day}`;
+      
+      // Преобразуем время в формат HH:MM
+      const formattedTime = timeSlot.split('-')[0].trim();
+      
+      console.log('Selected date object:', selectedDate);
+      console.log('Fetching students with params:', {
+        date,
+        timeSlot: formattedTime,
+        hallName: hall.name,
+        fullTimeSlot: timeSlot
+      });
+
+      const response = await fetch(`/api/booked-students/?date=${date}&timeSlot=${formattedTime}&hallId=${encodeURIComponent(hall.name)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         }
       });
+      
       if (!response.ok) {
-        throw new Error('Ошибка загрузки списка студентов');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка загрузки списка студентов');
       }
+      
       const data = await response.json();
+      console.log('Received students:', data);
       setStudentsForTimeSlot(data);
+      setShowStudentsList(true);
     } catch (error) {
       console.error('Error fetching students:', error);
-      alert('Не удалось загрузить список студентов');
+      alert(error.message || 'Не удалось загрузить список студентов');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleMarkAttendance = (hall) => {
+    const selectedTime = selectedTimeSlots[hall.id];
+    if (!selectedTime) {
+      showNotification('Выберите время пары');
+      return;
+    }
+    console.log('Marking attendance for:', {
+      hall,
+      selectedTime
+    });
+    fetchStudents(hall, selectedTime);
+  };
+
   useEffect(() => {
     if (showStudentsList) {
-      fetchStudents();
+      // fetchStudents();
     }
   }, [showStudentsList]);
 
@@ -149,23 +185,6 @@ const TeacherView = () => {
       searchInputRef.current.focus();
     }
   }, [searchName, isSearchFocused]);
-
-  const handleMarkAttendance = (hall) => {
-    const selectedTime = selectedTimeSlots[hall.id];
-    if (!selectedTime) {
-      showNotification('Выберите время пары');
-      return;
-    }
-    setShowStudentsList(true);
-    // В реальном приложении здесь будет запрос к API для получения студентов на конкретное время
-    const uniqueGroups = [...new Set(studentsForTimeSlot.map(student => student.group))];
-    // Устанавливаем значение по умолчанию 10 баллов для всех студентов
-    const defaultPoints = {};
-    const filteredStudents = studentsForTimeSlot.filter(student => {
-      defaultPoints[student.id] = 10;
-    });
-    setSelectedPoints(defaultPoints);
-  };
 
   const handleSearch = () => {
     const filtered = studentsForTimeSlot.filter(student => {
@@ -238,22 +257,40 @@ const TeacherView = () => {
   };
 
   const fetchHallCapacity = async (hallId, time) => {
-    // TODO: Здесь будет реальный запрос к API
-    // Пока используем моковые данные
-    const mockCapacities = {
-      '8:30': { current: 15, max: 30 },
-      '10:10': { current: 25, max: 30 },
-      '11:50': { current: 10, max: 30 },
-      '13:30': { current: 20, max: 30 },
-      '15:10': { current: 5, max: 30 },
-      '16:50': { current: 28, max: 30 },
-      '18:30': { current: 12, max: 30 },
-    };
-
-    // Имитация задержки запроса
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    return mockCapacities[time] || { current: 0, max: 30 };
+    try {
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const date = `${year}-${month}-${day}`;
+      
+      const formattedTime = time.split('-')[0].trim();
+      
+      // Получаем имя зала из HALLS
+      const hall = HALLS[selectedLocation].find(h => h.id === hallId);
+      if (!hall) {
+        throw new Error('Зал не найден');
+      }
+      
+      const response = await fetch(`/api/hall-capacity/?date=${date}&timeSlot=${formattedTime}&hallId=${encodeURIComponent(hall.name)}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Ошибка получения данных о заполненности зала');
+      }
+      
+      const data = await response.json();
+      return {
+        current: data.current_capacity || 0,
+        max: data.max_capacity || 30
+      };
+    } catch (error) {
+      console.error('Error fetching hall capacity:', error);
+      return { current: 0, max: 30 };
+    }
   };
 
   const handleTimeSelect = async (hallId, time) => {
@@ -592,13 +629,13 @@ const TeacherView = () => {
         <div className="location-buttons">
           <button
             className={`location-button ${selectedLocation === 'gorny' ? 'active' : ''}`}
-            onClick={() => handleLocationChange('gorny')}
+            onClick={() => setSelectedLocation('gorny')}
           >
             Горный
           </button>
           <button
             className={`location-button ${selectedLocation === 'belyaevo' ? 'active' : ''}`}
-            onClick={() => handleLocationChange('belyaevo')}
+            onClick={() => setSelectedLocation('belyaevo')}
           >
             Беляево
           </button>
@@ -612,7 +649,7 @@ const TeacherView = () => {
               onClick={() => handleDateSelect(date)}
             >
               <span className="date">{getDateString(date)}</span>
-              <span className="weekday">{getDayName(date)}</span>
+              <span className="day">{getDayName(date)}</span>
             </button>
           ))}
         </div>
@@ -703,22 +740,12 @@ const TeacherView = () => {
           </div>
         </div>
       </div>
-
       {showStudentsList && <StudentsList />}
-
       {notification.show && (
         <div className="notification">
           {notification.message}
         </div>
       )}
-      
-      {notification.show && (
-        <div className="notification">
-          {notification.message}
-        </div>
-      )}
-
-      {/* Модальное окно для начисления баллов */}
       {showAwardPointsModal && (
         <div className="modal-overlay">
           <div className="modal-content">

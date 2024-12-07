@@ -36,6 +36,7 @@ from django.utils import timezone
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from rest_framework_simplejwt.tokens import RefreshToken
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +241,6 @@ def register_student(request):
         student_number = request.data.get('student_number')
         group_name = request.data.get('group_name')
 
-        # Добавляем отладочный вывод
         print("Полученные данные:")
         print(f"email: {email}")
         print(f"full_name: {full_name}")
@@ -248,7 +248,6 @@ def register_student(request):
         print(f"group_name: {group_name}")
         print(f"password length: {len(password) if password else 0}")
 
-        # Проверяем обязательные поля по одному
         if not email:
             return Response({'error': 'Email обязателен'}, status=status.HTTP_400_BAD_REQUEST)
         if not password:
@@ -260,7 +259,6 @@ def register_student(request):
         if not group_name:
             return Response({'error': 'Группа обязательна'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Проверяем обязательные поля
         if not all([email, password, full_name, student_number, group_name]):
             return Response(
                 {'error': 'Все поля обязательны для заполнения'}, 
@@ -273,7 +271,6 @@ def register_student(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Проверяем, не существует ли уже студент с таким email или номером
         if User.objects.filter(email=email).exists():
             return Response(
                 {'error': 'Студент с таким email уже зарегистрирован'}, 
@@ -286,7 +283,6 @@ def register_student(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Создаем пользователя
         user = User.objects.create_user(
             email=email,
             password=password,
@@ -295,14 +291,12 @@ def register_student(request):
             is_teacher=False
         )
         
-        # Создаем профиль студента
         student = Student.objects.create(
             user=user,
             student_number=student_number,
             group_name=group_name
         )
 
-        # Создаем токен для автоматического входа
         token, _ = Token.objects.get_or_create(user=user)
 
         logger.info(f"Студент успешно создан: {user.id}")
@@ -322,7 +316,6 @@ def register_student(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-# Регистрация преподавателя
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_teacher(request):
@@ -347,14 +340,12 @@ def register_teacher(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Проверяем, не существует ли уже преподаватель с таким ФИО
         if User.objects.filter(full_name=full_name, is_teacher=True).exists():
             return Response(
                 {'error': 'Преподаватель с таким ФИО уже зарегистрирован'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Создаем уникальный email, добавляя числовой суффикс если нужно
         base_email = f"{full_name.replace(' ', '_').lower()}"
         email = f"{base_email}@edu.misis.ru"
         counter = 1
@@ -362,7 +353,6 @@ def register_teacher(request):
             email = f"{base_email}_{counter}@edu.misis.ru"
             counter += 1
 
-        # Создаем пользователя
         user = User.objects.create_user(
             email=email,
             password=password,
@@ -371,10 +361,8 @@ def register_teacher(request):
             is_student=False
         )
         
-        # Создаем профиль преподавателя
         teacher = Teacher.objects.create(user=user)
 
-        # Создаем токен для автоматического входа
         token, _ = Token.objects.get_or_create(user=user)
 
         logger.info(f"Преподаватель успешно создан: {user.id}")
@@ -394,7 +382,6 @@ def register_teacher(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-# Авторизация пользователя
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
@@ -446,7 +433,6 @@ def login_user(request):
         logger.error(f"Ошибка при входе: {str(e)}")
         return Response({'error': 'Ошибка сервера'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# Страница входа
 def signin(request):
     """
     Страница входа. Обрабатывает GET и POST запросы.
@@ -463,11 +449,10 @@ def signin(request):
         return render(request, 'signin.html', {'error': 'Неверные учетные данные'})
     return render(request, 'signin.html')
 
-# Главная страница для записи на занятия
 @login_required
 def home(request):
     """
-    Главная страница для записи на физкультуру.
+    Главная страница для записи на занятия.
     Отображает доступные залы и состояние записи.
     """
     halls = [
@@ -476,7 +461,6 @@ def home(request):
         {'name': 'Йога', 'time': '9:00-10:35', 'capacity': 30, 'max_capacity': 30},
     ]
 
-    # Логика обновления времени (примерно)
     current_time = request.GET.get('time', '10:50-12:25')
     times = ['9:00-10:35', '10:50-12:25', '12:40-14:15', '14:30-16:05', '16:30-18:05', '18:20-20:00']
 
@@ -487,7 +471,6 @@ def home(request):
     }
     return render(request, 'home.html', context)
 
-# Обработчик статики
 def serve_static(request, path):
     """
     Обрабатывает запросы на статику.
@@ -497,14 +480,12 @@ def serve_static(request, path):
         return FileResponse(open(file_path, 'rb'))
     raise Http404("Файл не найден")
 
-# Примерный список залов для демонстрации
 HALLS = [
     {'name': 'Тренажёрный зал', 'time': '10:50-12:25', 'capacity': 22, 'max_capacity': 30},
     {'name': 'Игровой зал', 'time': '9:00-10:35', 'capacity': 15, 'max_capacity': 30},
     {'name': 'Йога', 'time': '9:00-10:35', 'capacity': 30, 'max_capacity': 30},
 ]
 
-# Функция для получения информации о залах
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_halls(request):
@@ -517,24 +498,20 @@ def get_halls(request):
         if not date_str:
             return Response({'error': 'Date parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
             
-        # Конвертируем location в правильный формат
         location_mapping = {
             'gorny': 'Горный',
             'belyaevo': 'Беляево'
         }
         location = location_mapping.get(location, location)
         
-        # Отладочная информация
         all_halls = Hall.objects.all()
         logger.info(f"Всего залов в базе: {all_halls.count()}")
         for hall in all_halls:
             logger.info(f"Зал: {hall.name}, Локация: {hall.location.name if hall.location else 'Нет локации'}")
         
-        # Получаем все залы для данной локации
         halls = Hall.objects.filter(location__name=location)
         logger.info(f"Найдено залов для локации {location}: {halls.count()}")
         
-        # Если залов нет, используем дефолтные значения
         if not halls.exists():
             logger.warning(f"Залы не найдены в базе данных для локации {location}. Используем дефолтные значения.")
             default_halls = [
@@ -556,34 +533,25 @@ def get_halls(request):
             ]
             halls = default_halls
         
-        # Создаем словарь для подсчета загруженности
         hall_occupancy = {}
         time_slots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20']
         
-        # Инициализируем счетчики для всех временных слотов - всегда начинаем с 0
         for hall in halls:
             hall_name = hall['name'] if isinstance(hall, dict) else hall.name
             if hall_name not in hall_occupancy:
                 hall_occupancy[hall_name] = {time: 0 for time in time_slots}
         
-        # Подсчитываем текущую загруженность для каждого зала и времени
-        try:
-            bookings = Booking.objects.filter(
-                date=date_str,
-                hall__location__name=location
-            )
-            logger.info(f"Найдено {bookings.count()} бронирований")
-            
-            # Обновляем счетчики только если есть реальные записи
-            for booking in bookings:
-                time_str = booking.time_slot.strftime('%H:%M')
-                if booking.hall.name in hall_occupancy and time_str in hall_occupancy[booking.hall.name]:
-                    hall_occupancy[booking.hall.name][time_str] += 1
-                    
-        except Exception as e:
-            logger.error(f"Ошибка при получении бронирований: {str(e)}")
+        bookings = Booking.objects.filter(
+            date=date_str,
+            hall__location__name=location
+        )
+        logger.info(f"Найдено {bookings.count()} бронирований")
         
-        # Формируем ответ с данными о залах
+        for booking in bookings:
+            time_str = booking.time_slot.strftime('%H:%M')
+            if booking.hall.name in hall_occupancy and time_str in hall_occupancy[booking.hall.name]:
+                hall_occupancy[booking.hall.name][time_str] += 1
+                    
         halls_data = []
         for hall in halls:
             hall_name = hall['name'] if isinstance(hall, dict) else hall.name
@@ -596,7 +564,7 @@ def get_halls(request):
                 'max_capacity': hall_max_capacity,
                 'timeSlotCapacity': {
                     time: {
-                        'current': hall_occupancy[hall_name][time],  # Всегда будет 0, если нет записей
+                        'current': hall_occupancy[hall_name][time],  
                         'max': hall_max_capacity
                     } for time in time_slots
                 }
@@ -647,26 +615,22 @@ def award_points_manually(request):
     Ручное начисление баллов студенту преподавателем
     """
     try:
-        # Проверяем, что пользователь является преподавателем
         if not hasattr(request.user, 'teacher_profile'):
             return Response(
                 {'error': 'Только преподаватели могут начислять баллы'}, 
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Получаем данные из запроса
         student_id = request.data.get('student_id')
         points = request.data.get('points')
         reason = request.data.get('reason')
 
-        # Проверяем обязательные поля
         if not all([student_id, points, reason]):
             return Response(
                 {'error': 'Необходимо указать student_id, points и reason'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Находим студента
         try:
             student = Student.objects.get(id=student_id)
         except Student.DoesNotExist:
@@ -675,7 +639,6 @@ def award_points_manually(request):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Создаем запись о начислении баллов
         points_history = PointsHistory.objects.create(
             student=student,
             points=points,
@@ -711,15 +674,12 @@ def get_student_data(request):
     try:
         logger.info(f"Получен запрос на данные студента от пользователя: {request.user.email}")
         
-        # Получаем студента по текущему пользователю
         student = Student.objects.get(user=request.user)
         logger.info(f"Найден студент: {student.user.full_name}")
         
-        # Получаем историю баллов
         points_history = PointsHistory.objects.filter(student=student).order_by('-date')
         logger.info(f"Получена история баллов: {points_history.count()} записей")
         
-        # Подготавливаем данные истории
         history_data = [{
             'id': record.id,
             'date': record.date.strftime('%Y-%m-%d %H:%M:%S'),
@@ -729,7 +689,6 @@ def get_student_data(request):
             'awarded_by': record.awarded_by.user.full_name if record.awarded_by else None
         } for record in points_history]
         
-        # Формируем ответ
         response_data = {
             'full_name': student.user.full_name,
             'group': student.group_name,  
@@ -764,36 +723,34 @@ def create_booking(request):
     API endpoint для создания новой записи на занятие
     """
     try:
-        # Получаем данные из запроса
         hall_name = request.data.get('hall_name')
         date = request.data.get('date')
         time = request.data.get('time')
 
-        # Проверяем обязательные поля
         if not all([hall_name, date, time]):
             return Response(
                 {'error': 'Необходимо указать hall_name, date и time'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Находим зал
+        hall = Hall.objects.get(name=hall_name)
+
         try:
-            hall = Hall.objects.get(name=hall_name)
-        except Hall.DoesNotExist:
+            student = Student.objects.get(user=request.user)
+        except Student.DoesNotExist:
             return Response(
-                {'error': 'Зал не найден'}, 
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'Только студенты могут создавать записи'}, 
+                status=status.HTTP_403_FORBIDDEN
             )
 
-        # Создаем новую запись
         booking = Booking.objects.create(
             hall=hall,
+            student=student,
             date=date,
             time_slot=time,
-            user=request.user
+            status='PENDING'
         )
 
-        # Отправляем WebSocket уведомление
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             "bookings",
@@ -822,3 +779,102 @@ def create_booking(request):
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_booked_students(request):
+    """
+    Получение списка записанных студентов на конкретное время
+    """
+    try:
+        date = request.GET.get('date')
+        time_slot = request.GET.get('timeSlot')
+        hall_name = request.GET.get('hallId')  
+
+        logger.info(f"Получен запрос на список студентов:")
+        logger.info(f"date: {date}")
+        logger.info(f"time_slot: {time_slot}")
+        logger.info(f"hall_name: {hall_name}")
+
+        if not all([date, time_slot, hall_name]):
+            return Response(
+                {'error': 'Необходимо указать дату, время и зал'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            hall = Hall.objects.get(name=hall_name)
+            logger.info(f"Найден зал: {hall.name} (id: {hall.id})")
+        except Hall.DoesNotExist:
+            logger.error(f"Зал не найден: {hall_name}")
+            return Response(
+                {'error': f'Зал не найден: {hall_name}'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Получаем все записи на указанное время
+        bookings = Booking.objects.filter(
+            date=date,
+            time_slot=time_slot,
+            hall=hall
+        ).select_related('student', 'student__user')
+
+        logger.info(f"Найдено бронирований: {bookings.count()}")
+        for booking in bookings:
+            logger.info(f"Бронирование {booking.id}: {booking.student.user.full_name}, время: {booking.time_slot}")
+
+        students_data = []
+        for booking in bookings:
+            student = booking.student
+            students_data.append({
+                'id': student.id,
+                'name': student.user.full_name,
+                'email': student.user.email,
+                'group': student.group_name,
+                'booking_id': booking.id,
+                'status': booking.status
+            })
+
+        return Response(students_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Ошибка при получении списка студентов: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return Response(
+            {'error': 'Произошла ошибка при получении списка студентов'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def get_hall_capacity(request):
+    try:
+        date = request.GET.get('date')
+        time_slot = request.GET.get('timeSlot')
+        hall_id = request.GET.get('hallId')
+
+        if not all([date, time_slot, hall_id]):
+            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+
+        # Конвертируем дату из строки в объект datetime
+        booking_date = datetime.strptime(date, '%Y-%m-%d').date()
+
+        # Получаем общее количество бронирований для данного зала и времени
+        bookings_count = Booking.objects.filter(
+            hall__name=hall_id,
+            date=booking_date,
+            time_slot=time_slot
+        ).count()
+
+        # Получаем максимальную вместимость зала
+        hall = Hall.objects.get(name=hall_id)
+        max_capacity = hall.capacity
+
+        return JsonResponse({
+            'current_capacity': bookings_count,
+            'max_capacity': max_capacity
+        })
+
+    except Hall.DoesNotExist:
+        return JsonResponse({'error': 'Hall not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

@@ -353,3 +353,83 @@ def server_time(request):
     return Response({
         'server_time': timezone.now().strftime('%Y-%m-%d %H:%M:%S')
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_booked_students(request):
+    """
+    Получение списка записанных студентов на конкретное время
+    """
+    try:
+        date = request.GET.get('date')
+        time_slot = request.GET.get('timeSlot')
+        hall_name = request.GET.get('hallId')  
+
+        logger.info(f"Получен запрос на список студентов:")
+        logger.info(f"date: {date}")
+        logger.info(f"time_slot: {time_slot}")
+        logger.info(f"hall_name: {hall_name}")
+
+        if not all([date, time_slot, hall_name]):
+            return Response(
+                {'error': 'Необходимо указать дату, время и зал'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Преобразуем строку времени в объект time
+            time_obj = datetime.strptime(time_slot, '%H:%M').time()
+            logger.info(f"Преобразованное время: {time_obj}")
+            
+            # Преобразуем строку даты в объект date
+            date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+            logger.info(f"Преобразованная дата: {date_obj}")
+        except ValueError as e:
+            logger.error(f"Ошибка преобразования даты/времени: {str(e)}")
+            return Response(
+                {'error': f'Неверный формат даты или времени: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            hall = Hall.objects.get(name=hall_name)
+            logger.info(f"Найден зал: {hall.name} (id: {hall.id})")
+        except Hall.DoesNotExist:
+            logger.error(f"Зал не найден: {hall_name}")
+            return Response(
+                {'error': f'Зал не найден: {hall_name}'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Получаем все записи на указанное время
+        bookings = Booking.objects.filter(
+            date=date_obj,
+            time_slot=time_obj,
+            hall=hall
+        ).select_related('student', 'student__user')
+
+        logger.info(f"Найдено бронирований: {bookings.count()}")
+        for booking in bookings:
+            logger.info(f"Бронирование {booking.id}: {booking.student.user.full_name}, время: {booking.time_slot}")
+
+        students_data = []
+        for booking in bookings:
+            student = booking.student
+            students_data.append({
+                'id': student.id,
+                'name': student.user.full_name,
+                'email': student.user.email,
+                'group': student.group_name,
+                'booking_id': booking.id,
+                'status': booking.status
+            })
+
+        return Response(students_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Ошибка при получении списка студентов: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return Response(
+            {'error': 'Произошла ошибка при получении списка студентов'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

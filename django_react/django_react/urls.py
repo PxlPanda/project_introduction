@@ -10,10 +10,12 @@ urlpatterns = [
     path('api/students/', views.get_students, name='get_students'),
     path('api/save-points/', views.save_points, name='save_points'),
     path('api/student-data/', views.get_student_data, name='student_data'),
-    path('api/login/', views.login_api, name='login'),
+    path('api/login/', views.login_api, name='login_api'),
+    path('api/register-student/', views.register_student, name='register_student'),
     path('api/register-teacher/', views.register_teacher, name='register_teacher'),
-    path('api/register-student/', views.register_student, name='register-student'),
     path('api/halls/', views.get_halls, name='get_halls'),
+    path('api/booked-students/', views.get_booked_students, name='get_booked_students'),
+    path('api/hall-capacity/', views.get_hall_capacity, name='get_hall_capacity'),
     
     # Leads app URLs
     path('leads/', include('leads.urls')),
