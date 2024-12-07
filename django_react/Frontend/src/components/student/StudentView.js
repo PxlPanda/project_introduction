@@ -268,11 +268,10 @@ const StudentView = () => {
       }
   
       const locationName = selectedLocation === 'gorny' ? 'Горный' : 'Беляево';
-      // Используем локальную дату без преобразования в UTC
       const formattedDate = new Date(selectedDate).toLocaleDateString('en-CA');
   
       const response = await fetch(
-        `http://127.0.0.1:8000/leads/halls/?location=${encodeURIComponent(locationName)}&date=${formattedDate}`,
+        `http://127.0.0.1:8000/leads/halls/available_halls/?location=${encodeURIComponent(locationName)}&date=${formattedDate}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -288,46 +287,24 @@ const StudentView = () => {
   
       const data = await response.json();
       console.log('Raw halls response:', data);
-      console.log('First hall example:', data[0]);
-    
-      // Преобразуем данные в нужный формат
-      const timeSlots = TIME_SLOTS[selectedLocation];
-      console.log('Time slots for location:', selectedLocation, timeSlots);
-      const formattedHalls = data.map(hall => {
-        console.log('Processing hall:', hall);
-        console.log('Raw timeSlotCapacity:', hall.timeSlotCapacity);
-        const formatted = {
-          id: hall.id,
-          name: hall.name,
-          capacity: hall.capacity,
-          timeSlotCapacity: timeSlots.reduce((acc, time) => {
-            console.log('Processing time slot:', time, hall.timeSlotCapacity[time]);
-            const current = hall.timeSlotCapacity[time]?.current;
-            acc[time] = {
-              current: current !== undefined ? Math.max(0, current) : 0,
-              max: hall.capacity
-            };
-            return acc;
-          }, {})
-        };
-        console.log('Formatted hall:', formatted);
-        return formatted;
-      });
   
-      console.log('Final formatted halls:', formattedHalls);
+      // Получаем данные для текущей локации
+      const locationKey = selectedLocation === 'gorny' ? 'gorny' : 'belyaevo';
+      const locationData = data[locationKey] || [];
   
-      // Обновляем состояние, сохраняя предыдущие данные для другой локации
+      // Обновляем состояние только для текущей локации
       setHalls(prev => ({
         ...prev,
-        [selectedLocation]: formattedHalls
+        [selectedLocation]: locationData
       }));
+  
     } catch (error) {
       console.error('Error fetching halls:', error);
     }
   };
   
-  const gornyTimeSlots = ['9:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
-  const belyaevoTimeSlots = ['8:30', '10:10', '11:50', '13:30'];
+  const gornyTimeSlots = ['09:00', '10:50', '12:40', '14:30', '16:30', '18:20'];
+  const belyaevoTimeSlots = ['08:30', '10:10', '11:50', '13:30'];
 
   const normalizeTime = (time) => {
     return time.trim().replace(/^(\d):/, '0$1:');
