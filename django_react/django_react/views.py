@@ -835,3 +835,84 @@ def get_hall_capacity(request):
         return JsonResponse({'error': 'Hall not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_attendance(request):
+    """
+    Отметка посещаемости и начисление баллов студентам
+    """
+    if not hasattr(request.user, 'teacher_profile'):
+        return Response(
+            {'error': 'Доступ запрещен'}, 
+            status=status.HTTP_403_FORBIDDEN
+        )
+        
+    try:
+        student_ids = request.data.get('student_ids', [])
+        hall_name = request.data.get('hall_name')
+        date = request.data.get('date')
+        time_slot = request.data.get('time_slot')
+        points = request.data.get('points', 2)  # По умолчанию 2 балла
+        
+        if not all([student_ids, hall_name, date, time_slot]):
+            return Response(
+                {'error': 'Не все обязательные поля заполнены'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        hall = Hall.objects.get(name=hall_name)
+        teacher = request.user.teacher_profile
+        updated_students = {}
+        
+        for student_id in student_ids:
+            try:
+                student = Student.objects.get(id=student_id)
+                
+                # Получаем или создаем запись о посещении
+                booking, created = Booking.objects.get_or_create(
+                    hall=hall,
+                    student=student,
+                    date=date,
+                    time_slot=time_slot,
+                    defaults={'status': 'PENDING'}
+                )
+                
+                # Проверяем, не отмечен ли студент уже
+                if booking.status == 'PRESENT':
+                    continue
+                    
+                # Отмечаем присутствие
+                booking.status = 'PRESENT'
+                booking.marked_by = teacher
+                booking.marked_at = timezone.now()
+                booking.save()
+                
+                # Начисляем баллы
+                points_history = PointsHistory.objects.create(
+                    student=student,
+                    points=points,
+                    reason=f'Посещение {hall_name} {date} {time_slot}',
+                    booking=booking,
+                    awarded_by=teacher,
+                    points_type='AUTO'
+                )
+                
+                updated_students[student_id] = {
+                    'points': points,
+                    'booking_id': booking.id
+                }
+                
+            except Student.DoesNotExist:
+                continue
+                
+        return Response({
+            'message': 'Посещаемость и баллы успешно сохранены',
+            'updated_students': updated_students
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

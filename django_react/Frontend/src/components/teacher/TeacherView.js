@@ -8,6 +8,7 @@ import '../styles/buttons.css';
 import '../styles/header.css';
 import '../styles/calendar.css';
 import axios from 'axios';
+import '../styles/student_check.css';
 
 const SearchInput = React.memo(({ value, onChange }) => {
   const handleChange = useCallback((e) => {
@@ -47,6 +48,10 @@ const StudentsList = React.memo(({
   handleSavePoints,
   timeSlot,
   canDelete,
+  isStudentMarked,
+  selectedDate,
+  selectedTimeSlot,
+
 }) => {
   const uniqueGroups = [...new Set(originalStudents.map(student => student.group))];
   const [isEditingPoints, setIsEditingPoints] = useState(false);
@@ -183,30 +188,40 @@ const StudentsList = React.memo(({
               <div className="header-cell">Группа</div>
               <div className="header-cell">Статус</div>
             </div>
-            {studentsForTimeSlot.map(student => (
-              <div key={student.id} className="table-row">
-                <div className="table-cell">{student.name}</div>
-                <div className="table-cell">{student.group}</div>
-                <div className="table-cell">
-                  <label className="attendance-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedStudents.has(student.id)}
-                      onChange={(e) => {
-                        const newSelected = new Set(selectedStudents);
-                        if (e.target.checked) {
-                          newSelected.add(student.id);
-                        } else {
-                          newSelected.delete(student.id);
-                        }
-                        setSelectedStudents(newSelected);
-                      }}
-                    />
-                    <span className="checkmark"></span>
-                  </label>
-                </div>
-              </div>
-            ))}
+            {studentsForTimeSlot.map(student => {
+              const isMarked = isStudentMarked(
+                student.id,
+                selectedDate.toISOString().split('T')[0],
+                `${selectedTimeSlot?.id}` // преобразуем в строку
+              );
+              return (
+                  <div key={student.id} className={`table-row ${isMarked ? 'marked-student' : ''}`}>
+                      <div className="table-cell">{student.name}</div>
+                      <div className="table-cell">{student.group}</div>
+                        <div className="table-cell">
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <label className="attendance-checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedStudents.has(student.id)}
+                                    disabled={isMarked}
+                                    onChange={(e) => {
+                                        const newSelected = new Set(selectedStudents);
+                                        if (e.target.checked) {
+                                            newSelected.add(student.id);
+                                        } else {
+                                            newSelected.delete(student.id);
+                                        }
+                                        setSelectedStudents(newSelected);
+                                    }}
+                                />
+                                <span className="checkmark"></span>
+                            </label>
+                        </div>
+                      </div>
+                  </div>
+              );
+          })}
           </div>
 
           <div className="action-buttons">
@@ -233,10 +248,11 @@ const StudentsList = React.memo(({
 const TeacherView = () => {
   const [selectedLocation, setSelectedLocation] = useState('gorny');
   const [selectedDate, setSelectedDate] = useState(() => {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    return date;
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      return date;
   });
+  const API_BASE_URL = 'http://127.0.0.1:8000/api';
   const [selectedTimeSlots, setSelectedTimeSlots] = useState({});
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [showStudentsList, setShowStudentsList] = useState(false);
@@ -261,6 +277,73 @@ const TeacherView = () => {
   const searchInputRef = useRef(null);
   const [originalStudents, setOriginalStudents] = useState([]);
   const [canDelete, setCanDelete] = useState(false);
+
+  const [markedStudentsHistory, setMarkedStudentsHistory] = useState(() => {
+    try {
+        const saved = localStorage.getItem('markedStudentsHistory');
+        if (!saved) {
+            console.log('No saved history found, creating new Map');
+            return new Map();
+        }
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) {
+            console.log('Invalid saved history format, creating new Map');
+            return new Map();
+        }
+        const map = new Map(parsed);
+        console.log('Restored history map:', map);
+        return map;
+    } catch (error) {
+        console.error('Error parsing localStorage:', error);
+        return new Map();
+    }
+});
+
+// Отдельный useEffect для логирования изменений
+useEffect(() => {
+    console.log('markedStudentsHistory changed:', 
+        Array.from(markedStudentsHistory.entries()),
+        'Size:', markedStudentsHistory.size
+    );
+}, [markedStudentsHistory]);
+
+// useEffect для сохранения в localStorage
+useEffect(() => {
+    try {
+        const entries = Array.from(markedStudentsHistory.entries());
+        console.log('Saving entries to localStorage:', entries);
+        localStorage.setItem('markedStudentsHistory', JSON.stringify(entries));
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+    }
+}, [markedStudentsHistory]);
+
+  const createHistoryKey = (studentId, date, timeSlotId) => {
+    return `${studentId}_${date}_${timeSlotId}`;
+  };
+
+  // Добавить useEffect для сохранения состояния в localStorage
+  useEffect(() => {
+    // Сохраняем Map в localStorage
+    try {
+        const mapEntries = Array.from(markedStudentsHistory.entries());
+        localStorage.setItem('markedStudentsHistory', JSON.stringify(mapEntries));
+        console.log('Saving to localStorage:', mapEntries);
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+    }
+}, [markedStudentsHistory]);
+  
+  console.log('6. Current markedStudentsHistory:', 
+    Array.from(markedStudentsHistory.entries()));
+
+  // Функция для проверки, был ли студент уже отмечен
+  const isStudentMarked = (studentId, date, timeSlotId) => {
+    if (!timeSlotId) return false;
+    const key = createHistoryKey(studentId, date, timeSlotId);
+    console.log('Checking key in history:', key, Array.from(markedStudentsHistory.entries()));
+    return markedStudentsHistory.has(key);
+  };
 
   const checkCanDelete = useCallback(() => {
     if (!selectedTimeSlot) {
@@ -326,14 +409,17 @@ const TeacherView = () => {
   const handleMarkAttendance = (hall) => {
     const selectedTime = selectedTimeSlots[hall.id];
     if (!selectedTime) {
-      showNotification('Выберите время пары');
-      return;
+        showNotification('Выберите время пары');
+        return;
     }
-    console.log('Marking attendance for:', {
-      hall,
-      selectedTime
+    
+    setSelectedTimeSlot({
+      id: selectedTime, // Используем само время как ID
+      time: selectedTime,
+      start_time: selectedTime.split('-')[0].trim(),
+      hall: hall
     });
-    setSelectedTimeSlot(selectedTime);
+    
     fetchStudents(hall, selectedTime);
   };
 
@@ -438,6 +524,11 @@ const TeacherView = () => {
     }));
   };
 
+  useEffect(() => {
+    setSelectedStudents(new Set());
+    setPointsReasons({});
+}, [selectedDate, selectedTimeSlot]);
+
   const handleReasonChange = (studentId, reason) => {
     setPointsReasons(prev => ({
       ...prev,
@@ -446,123 +537,234 @@ const TeacherView = () => {
   };
 
   const handleSavePointsClick = async () => {
+    setIsLoading(true);
+    
     try {
-      setIsLoading(true);
-      
-      const selectedStudentIds = Array.from(selectedStudents);
-  
-      if (selectedStudentIds.length === 0) {
-        alert('Не выбраны студенты для начисления баллов');
-        return;
-      }
-      
-      console.log('selectedTimeSlot:', selectedTimeSlot);
-  
-      if (!selectedTimeSlot) {
-        alert('Не выбрано время занятия');
-        return;
-      }
-  
-      const studentsToUpdate = selectedStudentIds.map(studentId => ({
-        student_id: parseInt(studentId),
-        points: maxPoints,
-        reason: 'Посещение занятия'
-      }));
-  
-      const response = await fetch('/api/save-points/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          students_points: studentsToUpdate,
-          time_slot_id: selectedTimeSlot.id
-        })
-      });
-  
-      if (!response.ok) {
-        throw new Error('Ошибка сохранения баллов');
-      }
-  
-      const data = await response.json();
-      if (data.updated_students) {
-        const updatedStudentsMap = new Map(data.updated_students.map(s => [s.student_id, s]));
-        setStudentsForTimeSlot(prevStudents => 
-          prevStudents.map(student => ({
-            ...student,
-            points: updatedStudentsMap.get(student.id)?.points || student.points
-          }))
-        );
+        // Улучшенная валидация даты
+        if (!selectedDate || !(selectedDate instanceof Date) || isNaN(selectedDate)) {
+            alert('Некорректная дата занятия');
+            return;
+        }
+
+        // Улучшенная валидация времени
+        if (!selectedTimeSlot?.time || !/^\d{2}:\d{2}$/.test(selectedTimeSlot.time)) {
+          alert('Некорректный формат времени');
+          return;
+        }
+
+        const allowedSlots = timeSlots[selectedLocation] || [];
+        if (!selectedTimeSlot?.time || !allowedSlots.includes(selectedTimeSlot.time)) {
+            alert('Некорректное время занятия');
+            return;
+        }
+
+        if (!selectedStudents || selectedStudents.size === 0) {
+            alert('Не выбраны студенты для начисления баллов');
+            return;
+        }
+
+        console.log('5. Before filtering - Map state:', {
+            size: markedStudentsHistory.size,
+            entries: Array.from(markedStudentsHistory.entries()),
+            selectedDate: selectedDate,
+            currentDate: selectedDate.toISOString().split('T')[0],
+            selectedTimeSlot
+        });
+
+        const currentDate = selectedDate.toISOString().split('T')[0];
+        console.log('Using date for marking:', currentDate);
+
+        // Улучшенная фильтрация студентов
+        const unmarkedStudents = Array.from(selectedStudents).filter(studentId => {
+            if (!studentId || !Number.isInteger(Number(studentId)) || !selectedTimeSlot.id) {
+                console.error('Invalid studentId or timeSlotId:', { studentId, timeSlotId: selectedTimeSlot.id });
+                return false;
+            }
+            const key = createHistoryKey(studentId, currentDate, `${selectedTimeSlot.id}`);
+            const isMarked = markedStudentsHistory.has(key);
+            console.log('Checking student:', {
+                studentId,
+                currentDate,
+                timeSlotId: `${selectedTimeSlot.id}`,
+                key,
+                isMarked,
+                historySize: markedStudentsHistory.size
+            });
+            return !isMarked;
+        });
+
+        console.log('8. Unmarked students:', unmarkedStudents);
+
+        if (unmarkedStudents.length === 0) {
+            alert('Все выбранные студенты уже получили баллы за это занятие');
+            return;
+        }
+
+        // Добавляем таймаут для запроса
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
+
+        console.log('Sending request with data:', {
+          student_ids: unmarkedStudents,
+          hall_name: selectedTimeSlot.hall.name,
+          date: currentDate,
+          time_slot: selectedTimeSlot.time,
+          points: maxPoints
+        });
         
-        // Добавляем отправку события после успешного обновления
+        const response = await fetch(`${API_BASE_URL}/mark-attendance/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+            body: JSON.stringify({
+              student_ids: unmarkedStudents,
+              hall_name: selectedTimeSlot.hall.name,
+              date: currentDate,
+              time_slot: selectedTimeSlot.time,
+              points: maxPoints
+            }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error('Ошибка сохранения баллов');
+        }
+
+        const data = await response.json();
+
+        if (!data.updated_students) {
+            throw new Error('Сервер вернул некорректные данные');
+        }
+
+        // Обновляем Map только один раз
+        const newMap = new Map(markedStudentsHistory);
+        unmarkedStudents.forEach(studentId => {
+            if (data.updated_students[studentId]) {
+                const key = createHistoryKey(studentId, currentDate, selectedTimeSlot.time); // используем .time вместо .id
+                newMap.set(key, true);
+            }
+        });
+        setMarkedStudentsHistory(newMap);
+
+        // Обновляем UI
+        setStudentsForTimeSlot(prevStudents =>
+            prevStudents.map(student => ({
+                ...student,
+                points: data.updated_students[student.id]?.points || student.points
+            }))
+        );
+
+        console.log('9. After marking - Map state:', {
+            size: markedStudentsHistory.size,
+            entries: Array.from(markedStudentsHistory.entries())
+        });
+      
         window.dispatchEvent(new CustomEvent('student-points-updated', {
-          detail: {
-            updatedStudents: data.updated_students
-          }
+            detail: {
+                updatedStudents: data.updated_students
+            }
         }));
-      }
-  
-      alert('Баллы успешно сохранены');
-      setShowStudentsList(false);
+
+        alert('Баллы успешно начислены');
+
     } catch (error) {
-      console.error('Error saving points:', error);
-      alert(error.message || 'Произошла ошибка при сохранении баллов');
+        console.error('Error saving points:', error);
+        if (error.name === 'AbortError') {
+            alert('Превышено время ожидания ответа от сервера');
+        } else {
+            alert(error.message || 'Произошла ошибка при сохранении баллов');
+        }
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
   const fetchHallCapacity = async (hallId, time) => {
     try {
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const date = `${year}-${month}-${day}`;
-      
-      const formattedTime = time.split('-')[0].trim();
-      
-      // Получаем имя зала из HALLS
-      const hall = HALLS[selectedLocation].find(h => h.id === hallId);
-      if (!hall) {
-        throw new Error('Зал не найден');
-      }
-      
-      const response = await fetch(`/api/hall-capacity/?date=${date}&timeSlot=${formattedTime}&hallId=${encodeURIComponent(hall.name)}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+
+        // Получаем имя зала из HALLS
+        const hall = HALLS[selectedLocation].find(h => h.id === hallId);
+        if (!hall) {
+            throw new Error('Зал не найден');
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Ошибка получения данных о заполненности зала');
-      }
-      
-      const data = await response.json();
-      return {
-        current: data.current_capacity || 0,
-        max: data.max_capacity || 30
-      };
+
+        const response = await fetch(
+            `${API_BASE_URL}/hall-capacity/?date=${dateStr}&timeSlot=${time}&hallId=${encodeURIComponent(hall.name)}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch hall capacity');
+        }
+
+        const data = await response.json();
+        // Добавляем проверку формата данных
+        if (!data.hasOwnProperty('current_capacity') || !data.hasOwnProperty('max_capacity')) {
+            throw new Error('Invalid capacity data format');
+        }
+
+        setHallCapacities(prev => ({
+            ...prev,
+            [`${hallId}_${time}`]: {
+                current: data.current_capacity || 0,
+                max: data.max_capacity || 30
+            }
+        }));
+        
+        console.log('Updated hall capacity:', data);
     } catch (error) {
-      console.error('Error fetching hall capacity:', error);
-      return { current: 0, max: 30 };
+        console.error('Error fetching hall capacity:', error);
+        // Установим дефолтные значения в случае ошибки
+        setHallCapacities(prev => ({
+            ...prev,
+            [`${hallId}_${time}`]: { current: 0, max: 30 }
+        }));
     }
   };
 
-  const handleTimeSelect = async (hallId, time) => {
+  const handleTimeSelect = (hallId, timeSlot) => {
+    // Проверяем, что timeSlot существует в списке разрешенных слотов
+    const allowedSlots = timeSlots[selectedLocation] || [];
+    if (!timeSlot || !allowedSlots.includes(timeSlot)) {
+        console.error('Invalid time slot');
+        return;
+    }
+
+    // Находим объект зала
+    const hall = HALLS[selectedLocation].find(h => h.id === hallId);
+    if (!hall) {
+        console.error('Hall not found');
+        return;
+    }
+
     setSelectedTimeSlots(prev => ({
-      ...prev,
-      [hallId]: time
+        ...prev,
+        [hallId]: timeSlot
     }));
 
-    // Получаем данные о заполненности для выбранного времени
-    const capacity = await fetchHallCapacity(hallId, time);
-    setHallCapacities(prev => ({
-      ...prev,
-      [`${hallId}_${time}`]: capacity
-    }));
+    setSelectedTimeSlot({
+        id: timeSlot,
+        time: timeSlot,
+        start_time: timeSlot,
+        hall: hall  // Добавляем информацию о зале
+    });
+
+    // Обновляем заполненность зала
+    fetchHallCapacity(hallId, timeSlot);
   };
+
 
   const styles = `
     .modal-overlay {
@@ -1050,6 +1252,9 @@ const TeacherView = () => {
           handleSavePoints={handleSavePointsClick}
           timeSlot={selectedTimeSlot}
           canDelete={canDelete}
+          isStudentMarked={isStudentMarked}
+          selectedDate={selectedDate}
+          selectedTimeSlot={selectedTimeSlot}
         />
       )}
       {notification.show && (

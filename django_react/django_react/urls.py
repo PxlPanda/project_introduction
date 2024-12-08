@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/server-time/', views.get_server_time, name='server_time'),
     path('api/students/', views.get_students, name='get_students'),
     path('api/save-points/', views.save_points, name='save_points'),
+    path('api/mark-attendance/', views.mark_attendance, name='mark_attendance'),
     path('api/student-data/', views.get_student_data, name='student_data'),
     path('api/login/', views.login_api, name='login_api'),
     path('api/register-student/', views.register_student, name='register_student'),
