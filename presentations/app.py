@@ -1,10 +1,13 @@
 from fastapi import FastAPI, Path, Cookie, Response
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from services.registration_service import UserService
 from services.table_service import TableService
 from services.autentification_service import Autent
 from API.NYTimes import NWTimes_API
 from User_aut.auth2 import AuthJWT
+
 
 app = FastAPI(title = "Service for PE in MISIS")
 
@@ -59,9 +62,11 @@ def check_token(request, authorization_header):
     Autent.check_token(request, authorization_header)
     
     
-@app.post("/create_token")
+@app.get("/create_token")
 async def create_token(id):
-    return await Autent.create_token(id)
+    data = {"token" : await Autent.create_token(id)}
+    json_data = jsonable_encoder(data)
+    return JSONResponse(content = json_data)
     
 
 

@@ -25,7 +25,7 @@ class UserRepository:
         if email in admin_emails:
             is_admin = "True"
         uuid = uuid4_as_str()
-        token = str(Token.give_token(id = uuid))
+        token = str(await Token.give_token(id = uuid))
         hashed_password = sha256()
         password = password + os.getenv("SALT")
         hashed_password.update(password.encode())
